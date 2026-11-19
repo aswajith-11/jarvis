@@ -318,7 +318,44 @@ async function run(raw){
   if(/weather/.test(t)){const c=store.get('city','');window.open('https://www.google.com/search?q=weather'+(c?'+'+encodeURIComponent(c):''),'_blank','noopener');return say('Pulling up the weather.')}
   if(/joke/.test(t)){const j=['I would tell you a UDP joke, but you might not get it.','There are 10 kinds of people: those who understand binary and those who do not.','Why do programmers prefer dark mode? Because light attracts bugs.'];return say(j[Math.floor(Math.random()*j.length)])}
   if(/thank/.test(t))return say('Always a pleasure.');
-  say("I don't know that command yet. Try: open youtube, search black holes, what time is it, battery, start work mode, or code red.");
+  return askAI(raw);
+}
+
+const aiHistory=store.get('aiHistory',[]);
+async function askAI(raw){
+  if(!AG.ok){say('Connect your laptop agent first. Open the Laptop Link panel and enter the token from start_jarvis_agent.bat.');return}
+  const messages=[...aiHistory,{role:'user',content:String(raw).slice(0,2000)}];
+  setStatus('Thinking…',1);
+  try{
+    const response=await fetch(AG.url+'/ask',{method:'POST',
+      headers:{'Content-Type':'text/plain','X-Jarvis-Token':store.get('agtoken','')},
+      body:JSON.stringify({messages})});
+    if(response.status===401)throw new Error('token');
+    const plan=await response.json();
+    if(plan.type==='error')throw new Error(plan.message||'AI request failed');
+    aiHistory.push({role:'user',content:String(raw).slice(0,2000)});
+    if(plan.type==='action'){
+      aiHistory.push({role:'assistant',content:'I planned an approved laptop action.'});
+      store.set('aiHistory',aiHistory.slice(-12));
+      setStatus('Executing…',1);
+      await act(plan.action,'Done.');
+      return;
+    }
+    if(plan.type==='search'){
+      const q=String(plan.query||raw).slice(0,300);
+      aiHistory.push({role:'assistant',content:plan.reply||('Searching the web for '+q+'.')});
+      store.set('aiHistory',aiHistory.slice(-12));
+      say(plan.reply||('Searching the web for '+q+'.'));
+      window.open('https://www.google.com/search?q='+encodeURIComponent(q),'_blank','noopener');
+      return;
+    }
+    const reply=String(plan.reply||'I could not form a useful response.').slice(0,1800);
+    aiHistory.push({role:'assistant',content:reply});
+    store.set('aiHistory',aiHistory.slice(-12));
+    say(reply);
+  }catch(e){
+    say(e.message==='token'?'The laptop agent rejected your token.':e.message||'I could not reach the local AI.');
+  }finally{setStatus('Jarvis Ready')}
 }
 $('#cmd').onsubmit=e=>{e.preventDefault();const v=$('#txt').value;$('#txt').value='';run(v)};
 $$('[data-c]').forEach(b=>b.onclick=()=>run(b.dataset.c));
