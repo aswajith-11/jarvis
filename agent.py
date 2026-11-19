@@ -263,6 +263,83 @@ def handle(req):
     if a == "refresh_apps": build_index(); return {"message": f"Indexed {len(_index)} apps."}
     return {"message": f"Unknown action {a}."}
 
+
+# ---------------------------------------------------------------- local AI brain (Ollama)
+OLLAMA_URL = os.environ.get("JARVIS_OLLAMA_URL", "http://127.0.0.1:11434/api/chat")
+OLLAMA_MODEL = os.environ.get("JARVIS_MODEL", "llama3.2:1b")
+AI_ACTIONS = {"open_app", "open_url", "open_folder", "find_file", "volume",
+              "media", "screenshot", "show_desktop", "switch_window", "type",
+              "press", "lock", "sleep", "shutdown", "restart", "logoff", "close_app"}
+
+def ask_local_ai(messages):
+    """Ask Ollama to understand the request and return a constrained JSON plan."""
+    import urllib.request
+    system = (
+        "You are Jarvis, a helpful Windows laptop assistant. Understand natural language, "
+        "including indirect and multi-step requests. Return ONLY one JSON object, no markdown. "
+        "Schema: {\"type\":\"chat\",\"reply\":\"...\"} OR "
+        "{\"type\":\"search\",\"query\":\"...\",\"reply\":\"...\"} OR "
+        "{\"type\":\"action\",\"action\":{\"action\":\"...\",\"name\":\"...\","
+        "\"url\":\"...\",\"query\":\"...\",\"open\":false,\"level\":50,"
+        "\"direction\":\"up|down|mute\",\"key\":\"play|pause|next|prev|stop\","
+        "\"text\":\"...\",\"keys\":\"ctrl s\"}} OR "
+        "{\"type\":\"clarify\",\"reply\":\"...\"}. "
+        "Allowed action names ONLY: open_app, open_url, open_folder, find_file, volume, "
+        "media, screenshot, show_desktop, switch_window, type, press, lock, sleep, "
+        "shutdown, restart, logoff, close_app. Never invent an action. "
+        "For general knowledge, explanations, greetings, planning or conversation, use chat. "
+        "For current facts or finding information online, use search with a short query. "
+        "For opening an installed desktop app use open_app. For opening a website use open_url "
+        "with a full https URL. For file searches use find_file. Ask a concise clarification "
+        "when the target is ambiguous. Never request or reveal passwords, tokens or secrets. "
+        "Never use shell commands, scripts, arbitrary code, registry edits, or security bypasses. "
+        "Do not claim an action succeeded; the app will report its result. "
+        "For dangerous actions like shutdown, restart, logoff or force-closing an app, "
+        "the app will ask the user for confirmation."
+    )
+    clean = []
+    for item in messages[-12:]:
+        role = item.get("role")
+        content = str(item.get("content", ""))[:2000]
+        if role in ("user", "assistant") and content:
+            clean.append({"role": role, "content": content})
+    payload = json.dumps({
+        "model": OLLAMA_MODEL, "stream": False, "format": "json",
+        "messages": [{"role": "system", "content": system}] + clean,
+        "options": {"temperature": 0.2}
+    }).encode("utf-8")
+    req = urllib.request.Request(OLLAMA_URL, data=payload,
+                                 headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=90) as response:
+        data = json.loads(response.read().decode("utf-8"))
+    raw = data.get("message", {}).get("content", "")
+    plan = json.loads(raw)
+    if not isinstance(plan, dict):
+        raise ValueError("The AI returned an invalid plan.")
+    kind = plan.get("type")
+    if kind not in ("chat", "search", "action", "clarify"):
+        raise ValueError("The AI returned an unsupported response.")
+    if kind == "action":
+        action = plan.get("action")
+        if not isinstance(action, dict) or action.get("action") not in AI_ACTIONS:
+            raise ValueError("The AI requested an action that is not allowed.")
+        if action.get("action") == "open_app" and not str(action.get("name", "")).strip():
+            raise ValueError("Please tell me which application to open.")
+        if action.get("action") == "open_url":
+            url = str(action.get("url", ""))
+            if not url.startswith(("https://", "http://")) or len(url) > 2000:
+                raise ValueError("I need a valid website address before opening it.")
+        if action.get("action") == "find_file":
+            action["query"] = str(action.get("query", ""))[:160]
+            if not action["query"]:
+                raise ValueError("Please tell me which file to find.")
+        if action.get("action") == "type":
+            action["text"] = str(action.get("text", ""))[:2000]
+        if action.get("action") == "press":
+            action["keys"] = str(action.get("keys", ""))[:80]
+        plan["action"] = action
+    return plan
+
 # ---------------------------------------------------------------- http
 class H(BaseHTTPRequestHandler):
     def log_message(self, *a): pass
@@ -291,15 +368,28 @@ class H(BaseHTTPRequestHandler):
         if not hmac.compare_digest(self.headers.get("X-Jarvis-Token", ""), TOKEN): self._send(401, {"error": "bad token"}); return False
         return True
     def do_GET(self):
-        if self.path == "/ping" and self._auth(): self._send(200, {"ok": True, "os": OS, "gui": pyautogui is not None})
+        if self.path == "/ping" and self._auth():
+            self._send(200, {"ok": True, "os": OS, "gui": pyautogui is not None,
+                             "ai": True, "model": OLLAMA_MODEL})
     def do_POST(self):
-        if self.path != "/do" or not self._auth(): return
+        if self.path not in ("/do", "/ask") or not self._auth(): return
         try:
-            n = int(self.headers.get("Content-Length", 0)); req = json.loads(self.rfile.read(n) or b"{}")
-            log("ACTION", {k: v for k, v in req.items()})
-            self._send(200, handle(req))
+            n = int(self.headers.get("Content-Length", 0))
+            if n > 20000: return self._send(413, {"error": "request too large"})
+            req = json.loads(self.rfile.read(n) or b"{}")
+            if self.path == "/ask":
+                plan = ask_local_ai(req.get("messages", []))
+                if plan.get("type") == "action":
+                    log("AI PLAN", plan.get("action", {}).get("action"))
+                self._send(200, plan)
+            else:
+                log("ACTION", {k: v for k, v in req.items()})
+                self._send(200, handle(req))
         except Exception as e:
-            log("ERROR", e); self._send(200, {"message": f"That failed: {e}"})
+            log("ERROR", e)
+            message = ("Local AI is unavailable. Check that Ollama is running and "
+                       f"that model '{OLLAMA_MODEL}' is installed. Details: {e}")
+            self._send(200, {"type": "error", "message": message})
 
 if __name__ == "__main__":
     build_index()
