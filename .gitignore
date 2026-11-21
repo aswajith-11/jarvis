@@ -1,0 +1,12 @@
+# secrets and local data - never commit these
+.jarvis/
+.jarvis_token
+.jarvis_key
+token
+memory.json
+config.json
+.env
+*.log
+__pycache__/
+*.pyc
+Jarvis_Trash/
