@@ -19,6 +19,9 @@ _defaults = {
     # Scripts the AI may run BY NAME, always after you confirm. Example:
     # "backup": ["C:\\Users\\you\\scripts\\backup.bat"]
     "allowed_scripts": {},
+    # The agent opens this page already paired with your token when it starts (token is in the #hash, which never leaves your browser).
+    "site_url": "https://aswajith-11.github.io/jarvis/",
+    "auto_open": True,
 }
 _user = {}
 _f = DATA_DIR / "config.json"
@@ -35,6 +38,8 @@ NUM_CTX = int(_cfg["num_ctx"])
 LLM_TIMEOUT = int(_cfg["llm_timeout"])
 ALLOWED_ORIGINS = list(_cfg["allowed_origins"])
 ALLOWED_SCRIPTS = dict(_cfg["allowed_scripts"])
+SITE_URL = os.environ.get("JARVIS_SITE", _cfg["site_url"])
+AUTO_OPEN = bool(_cfg["auto_open"]) and not os.environ.get("JARVIS_NO_BROWSER")
 _roots = [HOME] + [Path(p) for p in _cfg["allowed_roots"]]
 ALLOWED_ROOTS = [r.resolve() for r in _roots if r.exists()]
 # Folders the AI can never touch, even inside the home folder (browser passwords, SSH keys, this app's token...)

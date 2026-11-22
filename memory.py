@@ -70,6 +70,12 @@ def context_text():
                 f"{a['tool']}({', '.join(str(v) for v in a['args'].values())}) {'ok' if a['ok'] else 'failed'}" for a in s["actions"][-6:]))
         return "\n".join(out)
 
+def fact(*keys):
+    """First remembered value among these keys, or ''."""
+    with LOCK:
+        f = _load()["facts"]
+        return next((f[k] for k in keys if k in f), "")
+
 def snapshot():
     with LOCK:
         s = _load(); return {"facts": dict(s["facts"]), "actions": s["actions"][-15:], "turns": len(s["history"]) // 2}

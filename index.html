@@ -4,6 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Jarvis Personal AI</title>
+<meta name="theme-color" content="#020a12">
+<meta name="description" content="JARVIS: a voice-enabled personal AI that controls your laptop. Local Ollama brain, no cloud AI.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -26,21 +31,22 @@
 <div id="top">
   <h1>Jarvis Personal AI</h1>
   <div class="tools">
-    <span class="chip" id="agchip">● Agent offline</span><span class="chip brain" id="brainchip">Brain: –</span>
+    <span class="chip" id="agchip">● Agent offline</span><span class="chip brain" id="brainchip">Brain: –</span><span class="chip" id="wakechip" style="display:none"></span>
     <span class="chip" id="clock">--:--</span>
     <button title="Stop (Esc)" id="stopbtn">■</button>
-    <button title="Laptop link" data-p="link" id="linkbtn">💻</button>
+    <button title="Wake word: say “Jarvis…”" id="wakebtn">🎧</button>
+    <button title="Conversation" data-p="log">💬</button>
+    <button title="Laptop link &amp; setup" data-p="link" id="linkbtn">💻</button>
     <button title="Memory" data-p="memory">🧠</button>
-    <button title="Battery" data-p="battery">🔋</button>
-    <button title="System info" data-p="sys">🖥</button>
-    <button title="Automations" data-p="auto">⚡</button>
-    <button title="Quotes" data-p="quotes">❝</button>
-    <button title="Profile" data-p="profile">👤</button>
+    <button title="Settings" data-p="settings">⚙</button>
+    <button title="Install as app" id="installbtn" style="display:none">⬇</button>
     <button title="Mute voice" id="mute">🔊</button>
     <button title="Code Red" id="redbtn" style="color:#ff4d5e">▲</button>
   </div>
 </div>
 
+<div id="hud"><div class="m"><span>CPU</span><i><b id="hcpu"></b></i><em id="hcput">–</em></div><div class="m"><span>RAM</span><i><b id="hram"></b></i><em id="hramt">–</em></div><div class="m" id="hbatrow"><span>BAT</span><i><b id="hbat"></b></i><em id="hbatt">–</em></div></div>
+<div id="toasts"></div>
 <div id="status">Jarvis Ready</div>
 <div id="reply"></div>
 <div id="steps"></div>
@@ -78,17 +84,36 @@
 
 <section class="panel" id="p-quotes"><h2><button data-close>←</button>QUOTES</h2><div class="card" style="max-width:640px"><div id="qtext" style="font-size:20px;line-height:1.5"></div><p id="qby" style="margin-top:10px"></p><button class="btn" id="qnext" style="padding:6px 14px;border:1px solid var(--c);border-radius:8px;color:var(--c2)">Next quote</button></div></section>
 
-<section class="panel" id="p-link"><h2><button data-close>←</button>LAPTOP LINK</h2>
-  <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr));max-width:900px">
-  <div class="card"><h3>Agent: <span id="linkstat" class="st">checking…</span></h3>
-  <p>The Jarvis page controls your laptop through the helper <b>agent.py</b> running on this PC. Double-click <b>start_jarvis_agent.bat</b>, then paste the secret token it prints.</p>
-  <input id="agtoken" placeholder="Paste token from the agent window" autocomplete="off">
-  <button class="btn" id="agsave">Save &amp; connect</button>
-  <p style="margin-top:10px;font-size:12px">The token stays in this browser and on your laptop. Never put it on GitHub.</p></div>
-  <div class="card"><h3>AI brain: <span id="brainstat" class="st">unknown</span></h3>
-  <p>Jarvis thinks with <b>Ollama</b>, running locally on your laptop. No cloud AI, no API key, no cost.</p>
-  <p id="brainhint" style="color:#ffd24a"></p>
-  <p style="font-size:12px">Change the model in <code>~/.jarvis/config.json</code> (for example <code>{"model":"llama3.2:3b"}</code>) and run <code>ollama pull llama3.2:3b</code>. Bigger models follow multi-step instructions much better than the 1B model.</p></div></div></section>
+<section class="panel" id="p-link"><h2><button data-close>←</button>SETUP &amp; LAPTOP LINK</h2>
+  <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(310px,1fr));max-width:980px">
+  <div class="card"><h3>Status checklist</h3><div id="check"></div>
+    <p style="margin-top:10px;font-size:12px">Agent: <span id="linkstat" class="st">checking…</span> · Brain: <span id="brainstat" class="st">unknown</span></p><p id="brainhint" style="color:#ffd24a;font-size:12px"></p></div>
+  <div class="card"><h3>1 · Get the agent</h3>
+    <p>JARVIS controls your PC through a small helper program running on your laptop. Download it, unzip, and double-click <b>start_jarvis_agent.bat</b>. It opens this page already connected.</p>
+    <a class="btn" href="https://github.com/aswajith-11/jarvis/archive/refs/heads/main.zip" target="_blank" rel="noopener" style="display:inline-block;text-decoration:none">⬇ Download agent (zip)</a>
+    <h3 style="margin-top:14px">2 · Not connected? Paste the token</h3>
+    <input id="agtoken" placeholder="Token printed in the agent window" autocomplete="off">
+    <button class="btn" id="agsave">Save &amp; connect</button>
+    <p style="margin-top:10px;font-size:12px">The token stays in this browser and on your laptop. Never put it on GitHub.</p></div>
+  <div class="card"><h3>3 · The AI brain (Ollama)</h3>
+    <p>Jarvis thinks locally with <b>Ollama</b>: no cloud AI, no API key, no cost. Everyday commands run instantly without the model.</p>
+    <p style="font-size:12px">Better model: <code>ollama pull llama3.2:3b</code>, then put <code>{"model":"llama3.2:3b"}</code> in <code>~/.jarvis/config.json</code> and restart the agent.</p></div></div></section>
+
+<section class="panel" id="p-log"><h2><button data-close>←</button>CONVERSATION <button id="logclear">Clear</button></h2>
+  <div id="logview" class="card" style="max-width:720px;max-height:68vh;overflow:auto"></div></section>
+
+<section class="panel" id="p-settings"><h2><button data-close>←</button>SETTINGS</h2>
+  <div class="card" style="max-width:560px">
+    <label class="srow">Voice<select id="setvoice"></select></label>
+    <label class="srow">Speed <span id="ratev"></span><input id="setrate" type="range" min="0.6" max="1.6" step="0.05"></label>
+    <label class="srow">Pitch <span id="pitchv"></span><input id="setpitch" type="range" min="0.5" max="1.5" step="0.05"></label>
+    <label class="srow">Speech recognition language<select id="setlang"><option value="en-IN">English (India)</option><option value="en-US">English (US)</option><option value="en-GB">English (UK)</option><option value="hi-IN">Hindi</option><option value="ta-IN">Tamil</option><option value="ml-IN">Malayalam</option><option value="te-IN">Telugu</option></select></label>
+    <label class="srow chk"><input id="setwake" type="checkbox"> Wake word: always listen for “Jarvis…” (Chrome/Edge)</label>
+    <label class="srow chk"><input id="sethud" type="checkbox"> Show live CPU / RAM / battery</label>
+    <label class="srow">Agent address<input id="setagent" placeholder="http://127.0.0.1:8765"></label>
+    <button class="btn" id="settest" style="margin-top:8px">▶ Test voice</button>
+    <p style="font-size:12px;opacity:.7;margin-top:10px">Shortcuts: Space = talk · Esc = stop · Ctrl+K or / = type · ↑ ↓ = command history</p>
+  </div></section>
 
 <section class="panel" id="p-memory"><h2><button data-close>←</button>MEMORY <button id="memclear">Erase all</button></h2>
   <p style="opacity:.75;font-size:13px;margin-bottom:12px;max-width:620px">Everything here is stored only on your laptop (~/.jarvis/memory.json). I never save passwords or card numbers.</p>

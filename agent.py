@@ -4,7 +4,7 @@
 Runs on YOUR laptop, listens on 127.0.0.1 only, and requires a secret token on every request.
 The website sends it requests; the local Ollama model (ai_brain.py) plans, and tools.py acts.
 """
-import json, hmac, threading
+import json, hmac, threading, webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import config, tools, memory, ai_brain
 
@@ -76,8 +76,8 @@ class H(BaseHTTPRequestHandler):
         if not self._auth(): return
         if self.path == "/ping":
             self._send(200, {"ok": True, "os": config.OS, "gui": tools.pyautogui is not None, "brain": ai_brain.status(), "memory": memory.snapshot()})
-        elif self.path == "/state":
-            self._send(200, ai_brain.STATE)
+        elif self.path == "/state":                    # polled by the website: orb state, live stats, due reminders
+            self._send(200, {**ai_brain.STATE, "stats": tools.stats(), "alerts": tools.pop_alerts()})
         else: self._send(404, {"error": "not found"})
 
     def do_POST(self):
@@ -105,7 +105,11 @@ if __name__ == "__main__":
     else: print(f" AI brain: Ollama ready, model {config.MODEL}")
     print("\n YOUR SECRET TOKEN (paste into the Jarvis website, Laptop panel):\n")
     print("    ", TOKEN, "\n")
+    pair = config.SITE_URL.rstrip("/") + "/#token=" + TOKEN
+    print(" One-click link (opens Jarvis already connected):\n    ", pair, "\n")
     print(" Never share this token or put it on GitHub. Press Ctrl+C to stop.")
     print("=" * 62)
+    if config.AUTO_OPEN:
+        threading.Timer(1.2, lambda: webbrowser.open(pair)).start()
     try: ThreadingHTTPServer(("127.0.0.1", config.PORT), H).serve_forever()
     except KeyboardInterrupt: print("Bye.")

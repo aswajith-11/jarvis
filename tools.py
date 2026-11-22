@@ -4,7 +4,7 @@ Every tool is registered with a schema. The AI can only call tools listed here, 
 that pass validation. There is deliberately NO "run any shell command" tool: scripts must be
 named in config (allowed_scripts) and always need confirmation.
 """
-import os, shutil, subprocess, time, json, difflib, webbrowser, re, urllib.parse, platform
+import os, shutil, subprocess, time, json, difflib, webbrowser, re, urllib.parse, urllib.request, urllib.error, threading, platform
 from pathlib import Path
 import config, memory
 from config import OS, HOME
@@ -479,3 +479,59 @@ def remember(key, value):
 def forget(key):
     if memory.forget(key): return f"Forgot {key}."
     raise ToolError(f"I had nothing saved as {key}.")
+
+# ---------------------------------------------------------------- brightness, timers, weather, live stats
+@tool("set_brightness", "Set the screen brightness from 0 to 100 (laptop screens on Windows).", {"level": ("int", True, "0-100")})
+def set_brightness(level):
+    if OS != "Windows": raise ToolError("Brightness control is only supported on Windows laptops.")
+    l = max(0, min(100, level))
+    r = subprocess.run(["powershell", "-NoProfile", "-Command",
+                        f"(Get-CimInstance -Namespace root/WMI -ClassName WmiMonitorBrightnessMethods).WmiSetBrightness(1,{l})"],
+                       capture_output=True, text=True, timeout=15, creationflags=NOWIN)
+    if r.returncode != 0: raise ToolError("This screen doesn't allow brightness control.")
+    return f"Brightness set to {l} percent."
+
+ALERTS = []; _alock = threading.Lock()
+def pop_alerts():
+    with _alock:
+        a = ALERTS[:]; ALERTS.clear(); return a
+
+@tool("set_timer", "Set a timer or reminder; Jarvis speaks it when the time is up (while the Jarvis page is open).",
+      {"minutes": ("num", True, "minutes from now"), "label": ("str", False, "what to remind about")})
+def set_timer(minutes, label=""):
+    m = max(0.05, min(1440, minutes))
+    text = f"Reminder: {label}." if label.strip() else "Your timer is up."
+    def fire():
+        with _alock: ALERTS.append({"text": text, "t": time.strftime("%H:%M")})
+    th = threading.Timer(m * 60, fire); th.daemon = True; th.start()
+    return f"Okay, I'll remind you in {m:g} minute{'s' if m != 1 else ''}."
+
+WMO = {0: "clear skies", 1: "mostly clear skies", 2: "partly cloudy skies", 3: "overcast skies", 45: "fog", 48: "fog", 51: "light drizzle", 53: "drizzle",
+       55: "heavy drizzle", 61: "light rain", 63: "rain", 65: "heavy rain", 71: "light snow", 73: "snow", 75: "heavy snow", 80: "rain showers",
+       81: "rain showers", 82: "violent rain showers", 95: "a thunderstorm", 96: "a thunderstorm with hail", 99: "a thunderstorm with hail"}
+def _getjson(url):
+    return json.loads(urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "JARVIS"}), timeout=10).read())
+
+@tool("weather", "Get the current weather for a city.", {"city": ("str", True, "city name")})
+def weather(city):
+    try:
+        g = _getjson("https://geocoding-api.open-meteo.com/v1/search?count=1&name=" + urllib.parse.quote(city))
+        if not g.get("results"): raise ToolError(f"I couldn't find a place called {city}.")
+        r = g["results"][0]
+        w = _getjson("https://api.open-meteo.com/v1/forecast?latitude=%s&longitude=%s&timezone=auto&current=temperature_2m,apparent_temperature,"
+                     "relative_humidity_2m,weather_code" % (r["latitude"], r["longitude"]))["current"]
+    except (urllib.error.URLError, TimeoutError):
+        raise ToolError("I couldn't reach the weather service. Check your internet connection.")
+    return (f"In {r['name']} it is {round(w['temperature_2m'])} degrees Celsius with {WMO.get(w['weather_code'], 'changing conditions')}. "
+            f"It feels like {round(w['apparent_temperature'])} and humidity is {w['relative_humidity_2m']} percent.")
+
+def stats():
+    """Live numbers for the HUD on the website (None if psutil isn't installed)."""
+    if not psutil: return None
+    d = {"cpu": round(psutil.cpu_percent(interval=None)), "ram": round(psutil.virtual_memory().percent)}
+    try:
+        b = psutil.sensors_battery()
+        if b: d["battery"] = round(b.percent); d["plugged"] = bool(b.power_plugged)
+    except Exception: pass
+    return d
+if psutil: psutil.cpu_percent(interval=None)       # prime the counter

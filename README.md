@@ -14,8 +14,9 @@ The AI runs **locally in Ollama**: no cloud AI, no API key, no cost.
 ## Files
 | File | Purpose |
 |---|---|
-| index.html, style.css, script.js | The interface (host on GitHub Pages) |
+| index.html, style.css, script.js, manifest, sw.js, icons | The interface (hosted on GitHub Pages; installable as an app) |
 | agent.py | Secure local server (localhost only, token required) |
+| planner.py | Rule-based planner for common multi-step commands |
 | ai_brain.py | Ollama connection + validated multi-step planner |
 | tools.py | Laptop-control tools (apps, files, keys, volume, power...) |
 | memory.py | Local memory, with a panel to view/delete it |
@@ -25,25 +26,28 @@ The AI runs **locally in Ollama**: no cloud AI, no API key, no cost.
 
 ## Install (Windows 11)
 1. **Python 3.10+** from python.org (tick "Add Python to PATH").
-2. **Ollama** is already installed. Make sure the model exists: `ollama pull llama3.2:1b`
-3. Copy all files into one folder on your laptop. Double-click **start_jarvis_agent.bat**.
-   It prints a **secret token**. Keep the window open.
-4. Open your Jarvis website, click the **💻** icon, paste the token, **Save & connect**.
-   The top bar should show `● Agent online` and `Brain: llama3.2:1b`.
+2. **Ollama** (you have it). Make sure the model exists: `ollama pull llama3.2:1b`
+3. Download this project (green **Code > Download ZIP**), unzip it, and double-click **start_jarvis_agent.bat**.
+4. Your browser opens JARVIS **already connected** (the agent opens `https://aswajith-11.github.io/jarvis/#token=...`).
+   Top bar should show `● Agent online` and `Brain: llama3.2:1b`. The 💻 panel has a live setup checklist if anything is missing.
 
-## Update your GitHub site
-Replace `index.html` and add `style.css` and `script.js` in your repository. Do **not** upload `agent.py`'s data:
-the token and memory live in `~/.jarvis/` on your laptop, not in the project folder. `.gitignore` already protects them.
-(agent.py and the other .py files may be in the repo too; they contain no secrets.)
+If the page didn't open, or you use a different browser profile, open the site, click 💻 and paste the token from the agent window.
+
+## What's new in this version
+- **Planner**: common requests, even multi-step ones ("Open Chrome, visit YouTube and search for Python tutorials"), run instantly from rules.
+  Only open-ended requests go to the Ollama model, so a tiny model works much better.
+- **One-click pairing**, live **CPU / RAM / battery HUD**, **reminders** ("remind me in 10 minutes to stretch"),
+  **weather** (free, no key), **brightness**, **wake word** ("Jarvis, ..."), **conversation log**, **settings** (voice, speed, language incl. Hindi/Tamil/Malayalam/Telugu),
+  command history (up/down), and **install as an app** (the install button in the top bar, or your browser's install icon).
 
 ## Things to say
-- "Open Chrome and search for artificial intelligence." - "Open Notepad and type hello team."
-- "Find my latest PDF." - "Create a folder named Projects on my desktop." - "Open my downloads folder."
-- "Which applications do I have with 'code' in the name?" - "Take a screenshot." - "Set volume to 30."
-- Follow-ups: "Open it again." "Close the app you opened earlier."
-- "Remember that my favourite editor is VS Code." (Never passwords.)
-Quick commands (volume, media, lock, "open spotify"...) run instantly; everything else goes to the AI.
-Stop anything with the **■** button, the **Esc** key, or by clicking the orb.
+- "Open Chrome and search for artificial intelligence." - "Open Chrome, visit YouTube and search for Python tutorials."
+- "Open Notepad and type hello team." - "Find my latest PDF." - "Create a folder named Projects on my desktop."
+- "What's the weather in Mumbai?" - "Remind me in 10 minutes to stretch." - "Set volume to 30." - "Set brightness to 60."
+- "Which applications do I have with 'code' in the name?" - "Take a screenshot." - "Lock the laptop."
+- "Remember that my city is Chennai." then just "what's the weather".
+- Follow-ups go to the AI with memory of what you did: "Open it again." "Close the app you opened earlier."
+Stop anything with the **stop button**, **Esc**, or by clicking the orb. Shortcuts: **Space** talk, **Ctrl+K** or **/** type.
 
 ## Choosing a better model
 `llama3.2:1b` is tiny and will sometimes misunderstand complex requests. JARVIS checks every step, so mistakes are

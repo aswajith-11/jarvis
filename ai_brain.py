@@ -7,7 +7,7 @@ Why this design: small local models (like llama3.2:1b) are unreliable at native 
   4. build the final answer so it never claims an action that the tools did not confirm.
 """
 import json, re, threading, urllib.request, urllib.error, socket
-import config, tools, memory
+import config, tools, memory, planner
 
 class BrainError(Exception): pass
 
@@ -118,7 +118,32 @@ def _exec(ctx, name, clean):
     res = tools.execute(name, clean, confirmed=True)
     memory.log_action(name, clean, res["ok"], res["message"])
     ctx["steps"].append({"tool": name, "ok": res["ok"], "message": res["message"][:200], "args": {} if name in memory.NO_ARGS else clean})
-    ctx["msgs"].append({"role": "user", "content": _result_msg(name, res)})
+    if ctx.get("msgs") is not None: ctx["msgs"].append({"role": "user", "content": _result_msg(name, res)})
+
+# ---- fast path: rule-based plans run without the language model
+def _run_plan(ctx):
+    while ctx["queue"]:
+        name, args = ctx["queue"].pop(0)
+        if STOP.is_set():
+            ctx["queue"].clear(); return _finish_plan(ctx, "Okay, I stopped.")
+        try: clean = tools.validate(name, args)
+        except tools.ToolError as e:
+            ctx["steps"].append({"tool": name, "ok": False, "message": str(e), "args": {}}); break
+        d = tools.needs_confirm(name, clean)
+        if d:
+            PENDING[0] = (ctx, name, clean); set_state("confirm", d)
+            return {"needs_confirm": True, "message": f"This will {d}.", "steps": ctx["steps"]}
+        _exec(ctx, name, clean)
+        if not ctx["steps"][-1]["ok"]: break
+    return _finish_plan(ctx)
+
+def _finish_plan(ctx, say=None):
+    steps = [s for s in ctx["steps"] if s["tool"] != "wait"]
+    if say is None:
+        if steps and not steps[-1]["ok"]: say = "That didn't work: " + steps[-1]["message"]
+        else: say = " ".join(s["message"] for s in steps)[:320] or "Done."
+    memory.add_turn(ctx["user"], say); set_state("idle")
+    return {"message": say, "steps": ctx["steps"]}
 
 def _finish(ctx, say):
     steps = ctx["steps"]
@@ -175,6 +200,10 @@ def _guard(fn, *a):
 def think(text):
     STOP.clear()
     if PENDING[0]: PENDING[0] = None                                           # new request replaces an unanswered confirmation
+    try: steps = planner.plan(text)
+    except Exception: steps = None
+    if steps:                                                                  # understood by rules: no model needed
+        return _guard(_run_plan, {"msgs": None, "user": text, "steps": [], "queue": list(steps)})
     ctx = {"msgs": [{"role": "system", "content": system_prompt()}] + memory.history(5) + [{"role": "user", "content": text}],
            "user": text, "steps": [], "seen": {}, "bad": 0}
     return _guard(_run, ctx)
@@ -184,6 +213,12 @@ def confirm(approve):
     p, PENDING[0] = PENDING[0], None
     if not p: set_state("idle"); return {"message": "There's nothing waiting for confirmation."}
     ctx, name, clean = p
+    if ctx.get("queue") is not None:                                           # a rule-based plan was waiting for the user's OK
+        if approve: _exec(ctx, name, clean)
+        else:
+            ctx["queue"].clear(); ctx["steps"].append({"tool": name, "ok": True, "message": "Declined by you.", "args": {}})
+            return _finish_plan(ctx, "Okay, I won't do that.")
+        return _guard(_run_plan, ctx) if ctx["steps"][-1]["ok"] else _finish_plan(ctx)
     if approve: _exec(ctx, name, clean)
     else:
         ctx["steps"].append({"tool": name, "ok": True, "message": "Declined by you.", "args": {}})

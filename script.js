@@ -1,34 +1,67 @@
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 const store={get(k,d){try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}}};
+/* one-click pairing: the agent opens this page as .../#token=XXXX ; keep the token, then remove it from the address bar */
+(function(){const m=location.hash.match(/token=([\w-]+)/);if(m){store.set('agtoken',m[1]);try{history.replaceState(null,'',location.pathname+location.search)}catch{}}})();
 let muted=store.get('muted',false);
+const SET=Object.assign({voice:'',rate:1,pitch:.95,lang:'en-IN',wake:false,hud:true,agent:'http://127.0.0.1:8765'},store.get('settings',{}));
+const saveSet=()=>store.set('settings',SET);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+/* transcript (kept only in this browser) */
+const LOG=store.get('log',[]);
+function logMsg(who,text){LOG.push({who,text:String(text).slice(0,400),t:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})});while(LOG.length>80)LOG.shift();store.set('log',LOG);if($('#p-log').classList.contains('open'))renderLog()}
+function renderLog(){const el=$('#logview');el.innerHTML=LOG.length?LOG.map(m=>`<div class="bub ${m.who}"><small>${m.who==='you'?'You':'Jarvis'} · ${esc(m.t)}</small>${esc(m.text)}</div>`).join(''):'<p>No conversation yet.</p>';el.scrollTop=el.scrollHeight}
+/* toasts + chime */
+function toast(msg,cls=''){const d=document.createElement('div');d.className='toast '+cls;d.textContent=msg;$('#toasts').appendChild(d);setTimeout(()=>d.classList.add('out'),3600);setTimeout(()=>d.remove(),4200)}
+function chime(f=880){try{const a=new (window.AudioContext||window.webkitAudioContext)(),o=a.createOscillator(),g=a.createGain();o.frequency.value=f;g.gain.value=.05;o.connect(g);g.connect(a.destination);o.start();g.gain.exponentialRampToValueAtTime(.0001,a.currentTime+.25);o.stop(a.currentTime+.26);setTimeout(()=>a.close(),400)}catch{}}
 /* ---------- speech ---------- */
-const synth=window.speechSynthesis;
-function say(t){
+const synth=window.speechSynthesis;let speakingNow=false;
+function pickVoice(){const vs=synth?synth.getVoices():[];if(SET.voice){const v=vs.find(v=>v.name===SET.voice);if(v)return v}
+  return vs.find(v=>/en-(GB|IN|US)/.test(v.lang)&&/male|daniel|ravi|george|david|google uk english male/i.test(v.name))||vs.find(v=>/^en/.test(v.lang))||null}
+function say(t,opts={}){
   $('#reply').textContent=t; clearTimeout(say.t); say.t=setTimeout(()=>$('#reply').textContent='',9000);
+  if(!opts.nolog)logMsg('jarvis',t);
   if(muted||!synth)return;
-  synth.cancel(); const u=new SpeechSynthesisUtterance(t);
-  const v=synth.getVoices().find(v=>/en-(GB|US)/.test(v.lang)&&/male|daniel|google uk english male|david/i.test(v.name))||synth.getVoices().find(v=>/^en/.test(v.lang));
-  if(v)u.voice=v; u.rate=1; u.pitch=.9;
-  u.onstart=()=>{setOrb('speak');setStatus('Speaking…',1)}; u.onend=()=>{if(window.orbState==='speak')setOrb('idle');setStatus('Jarvis Ready')};
-  synth.speak(u);clearTimeout(say.r);say.r=setTimeout(()=>{if($('#status').textContent==='Speaking…'){setStatus('Jarvis Ready');if(window.orbState==='speak')setOrb('idle')}},Math.max(3000,t.length*90));
+  synth.cancel(); const u=new SpeechSynthesisUtterance(t),v=pickVoice();
+  if(v)u.voice=v; u.rate=+SET.rate||1; u.pitch=+SET.pitch||1;
+  u.onstart=()=>{speakingNow=true;setOrb('speak');setStatus('Speaking…',1)}; u.onend=()=>{speakingNow=false;if(window.orbState==='speak')setOrb('idle');setStatus('Jarvis Ready')};
+  u.onerror=u.onend;
+  synth.speak(u);clearTimeout(say.r);say.r=setTimeout(()=>{speakingNow=false;if($('#status').textContent==='Speaking…'){setStatus('Jarvis Ready');if(window.orbState==='speak')setOrb('idle')}},Math.max(3000,t.length*95));
 }
 function setStatus(t,on){const s=$('#status');s.textContent=t;s.classList.toggle('on',!!on)}
 $('#mute').onclick=()=>{muted=!muted;store.set('muted',muted);$('#mute').textContent=muted?'🔇':'🔊';if(muted)synth&&synth.cancel()};
 $('#mute').textContent=muted?'🔇':'🔊';
 const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-let rec,listening=false;
-if(SR){rec=new SR();rec.lang='en-US';rec.interimResults=false;
-  rec.onstart=()=>{listening=true;setOrb('listen');setStatus('Listening…',1)};
-  rec.onend=()=>{listening=false;if(window.orbState==='listen')setOrb('idle');if($('#status').textContent==='Listening…')setStatus('Jarvis Ready')};
-  rec.onresult=e=>{const t=e.results[0][0].transcript;$('#reply').textContent='“'+t+'”';run(t)};
-  rec.onerror=e=>{say(e.error==='not-allowed'?'Microphone permission was denied.':'I did not catch that.')};
+let rec,listening=false,recMode='cmd',awaitUntil=0,manualStop=false,cmdPending=false;
+function updWake(){const c=$('#wakechip');if(!c)return;c.style.display=SET.wake?'':'none';c.textContent=listening&&recMode==='wake'?'🎧 Say “Jarvis…”':SET.wake?'🎧 Wake word on':'';$('#wakebtn').classList.toggle('on',!!SET.wake)}
+if(SR){rec=new SR();rec.interimResults=false;
+  rec.onstart=()=>{listening=true;cmdPending=false;if(recMode==='cmd'){setOrb('listen');setStatus('Listening…',1)}updWake()};
+  rec.onend=()=>{listening=false;if(recMode==='cmd'&&window.orbState==='listen')setOrb('idle');if($('#status').textContent==='Listening…')setStatus('Jarvis Ready');
+    if(SET.wake&&!manualStop&&!cmdPending)setTimeout(()=>{if(!listening)startRec('wake')},500);updWake()};
+  rec.onresult=e=>{const r=e.results[e.results.length-1];if(!r.isFinal)return;const t=r[0].transcript.trim();if(!t)return;
+    if(recMode==='cmd'){$('#reply').textContent='“'+t+'”';run(t);return}
+    if(speakingNow)return;                                     // ignore my own voice
+    const m=t.match(/^(?:hey |ok |okay |hi )?jarvis\b[\s,.!?]*(.*)$/i);
+    if(m){if(m[1].trim())run(m[1]);else{awaitUntil=Date.now()+9000;chime();setStatus('Yes? I\'m listening…',1)}}
+    else if(Date.now()<awaitUntil){awaitUntil=0;run(t)}};
+  rec.onerror=e=>{if(e.error==='not-allowed'||e.error==='service-not-allowed'){SET.wake=false;saveSet();updWake();say('Microphone permission was denied.')}
+    else if(!['no-speech','aborted'].includes(e.error)&&recMode==='cmd')say('I did not catch that.')};
 }
-function toggleMic(){ if(window.orbState==='speak'){stopAll()} if(!rec){say('Voice input is not supported in this browser. Use Chrome or Edge, or type a command.');return}
-  if(listening)rec.stop();else{try{synth&&synth.cancel();rec.start()}catch{}}}
+function startRec(mode){if(!rec)return;rec.lang=SET.lang;rec.continuous=mode==='wake';manualStop=false;try{recMode=mode;rec.start()}catch{}}
+function toggleMic(){if(window.orbState==='speak')stopAll();
+  if(!rec){say('Voice input is not supported in this browser. Use Chrome or Edge, or type a command.');return}
+  if(listening){const wasWake=recMode==='wake';cmdPending=wasWake;rec.stop();if(wasWake)setTimeout(()=>{synth&&synth.cancel();startRec('cmd')},350);return}
+  try{synth&&synth.cancel()}catch{}startRec('cmd')}
+function setWake(on){SET.wake=on;saveSet();if(on){if(!rec){say('Wake word needs Chrome or Edge.');SET.wake=false;saveSet();updWake();return}if(listening){cmdPending=false}else startRec('wake');say('Wake word on. Say Jarvis, then your command.')}
+  else{manualStop=true;if(listening&&recMode==='wake')rec.stop();say('Wake word off.')}updWake();const c=$('#setwake');if(c)c.checked=on}
+$('#wakebtn').onclick=()=>setWake(!SET.wake);
 $('#mic').onclick=toggleMic; $('#core').onclick=()=>{if(window.orbState==='speak'||AG.busy)stopAll();else toggleMic()};
 $('#stopbtn').onclick=stopAll;
-document.addEventListener('keydown',e=>{if(e.key==='Escape')stopAll()});
-document.addEventListener('keydown',e=>{if(e.code==='Space'&&document.activeElement.tagName!=='INPUT'&&document.activeElement.tagName!=='TEXTAREA'){e.preventDefault();toggleMic()}});
+document.addEventListener('keydown',e=>{
+  const typing=['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName);
+  if(e.key==='Escape'){stopAll();closePanels();$('#txt').blur()}
+  else if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){e.preventDefault();$('#txt').focus()}
+  else if(!typing&&e.key==='/'){e.preventDefault();$('#txt').focus()}
+  else if(e.code==='Space'&&!typing){e.preventDefault();toggleMic()}});
 /* ---------- data ---------- */
 const QUOTES=[["The best way to predict the future is to invent it.","Alan Kay"],["Stay hungry, stay foolish.","Steve Jobs"],["Whether you think you can, or you think you can't — you're right.","Henry Ford"],["Genius is one percent inspiration and ninety-nine percent perspiration.","Thomas Edison"],["Sometimes you gotta run before you can walk.","Tony Stark"],["It always seems impossible until it's done.","Nelson Mandela"],["Simplicity is the ultimate sophistication.","Leonardo da Vinci"]];
 let qi=0;
@@ -45,7 +78,6 @@ let modes=store.get('modes',DEF_MODES);
 function renderModes(){
   $('#modes').innerHTML=modes.map((m,i)=>`<div class="card"><h3>${esc(m.n)}</h3><p>${esc(m.d)}</p><p style="font-size:11px">say: <b>start ${esc(m.n.toLowerCase())}</b> · ${m.links.length} link(s)</p><button class="btn" data-run="${i}">Run</button><button class="btn" data-edit="${i}">Edit</button><button class="btn" data-del="${i}">Delete</button></div>`).join('');
 }
-const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 function runMode(m){say('Starting '+m.n+'. Opening '+m.links.length+' link'+(m.links.length==1?'':'s')+'.');m.links.forEach((u,i)=>setTimeout(()=>window.open(u,'_blank','noopener'),i*250))}
 $('#modes').onclick=e=>{const b=e.target.closest('button');if(!b)return;
   if(b.dataset.run!=null)runMode(modes[b.dataset.run]);
@@ -58,7 +90,7 @@ $('#newmode').onclick=()=>{const n=prompt('New mode name');if(!n)return;const l=
   modes.push({n,d:'Custom mode.',links:l.split(',').map(s=>s.trim()).filter(Boolean).map(u=>/^https?:/.test(u)?u:'https://'+u)});store.set('modes',modes);renderModes()};
 renderModes();
 /* ---------- panels ---------- */
-function openPanel(id){closePanels();$('#p-'+id).classList.add('open');if(id==='battery')battery();if(id==='sys')sysinfo();if(id==='quotes')showQuote();if(id==='link'){$('#agtoken').value=store.get('agtoken','');ping()}if(id==='memory'){ping()}if(id==='profile'){$('#pname').value=store.get('name','');$('#pcity').value=store.get('city','')}}
+function openPanel(id){closePanels();$('#p-'+id).classList.add('open');if(id==='battery')battery();if(id==='sys')sysinfo();if(id==='quotes')showQuote();if(id==='link'){$('#agtoken').value=store.get('agtoken','');ping()}if(id==='memory'){ping()}if(id==='log')renderLog();if(id==='settings')fillSettings();if(id==='profile'){$('#pname').value=store.get('name','');$('#pcity').value=store.get('city','')}}
 function closePanels(){$$('.panel').forEach(p=>p.classList.remove('open'))}
 $$('[data-close]').forEach(b=>b.onclick=closePanels);
 $$('[data-p]').forEach(b=>b.onclick=()=>openPanel(b.dataset.p));
@@ -86,16 +118,17 @@ function beep(){try{const a=new AudioContext(),o=a.createOscillator(),g=a.create
   let t=0;const iv=setInterval(()=>{o.frequency.value=t++%2?520:760;if(t>8){clearInterval(iv);o.stop();a.close()}},220)}catch{}}
 /* ---------- brain: command router ---------- */
 const SITES={youtube:'https://www.youtube.com',google:'https://www.google.com',github:'https://github.com',gmail:'https://mail.google.com',whatsapp:'https://web.whatsapp.com',instagram:'https://www.instagram.com',twitter:'https://x.com',x:'https://x.com',facebook:'https://www.facebook.com',linkedin:'https://www.linkedin.com',netflix:'https://www.netflix.com',spotify:'https://open.spotify.com',maps:'https://maps.google.com',chatgpt:'https://chatgpt.com',claude:'https://claude.ai',reddit:'https://www.reddit.com',amazon:'https://www.amazon.in',wikipedia:'https://www.wikipedia.org'};
-function greet(){const h=new Date().getHours(),n=store.get('name','');return (h<12?'Good morning':h<17?'Good afternoon':'Good evening')+(n?', '+n:'')+'. All systems are online. How can I help?'}
+function greet(){const h=new Date().getHours(),n=store.get('name','');return (h<12?'Good morning':h<17?'Good afternoon':'Good evening')+(n?', '+n:'')+'. '+(AG.ok?'Your laptop link is active. ':'Laptop link is offline. ')+'How can I help?'}
 /* ---------- orb state ---------- */
 function setOrb(s){$('#core').dataset.state=s;window.orbState=s}
 setOrb('idle');
 function stopAll(){try{synth&&synth.cancel()}catch{}if(listening)try{rec.stop()}catch{}if(AG.ok&&AG.busy)agent({action:'stop'}).catch(()=>{});setOrb('idle');setStatus('Jarvis Ready')}
 /* ---------- laptop agent link (talks to agent.py on this laptop) ---------- */
-const AG={url:'http://127.0.0.1:8765',ok:false,bad:false,brain:null,busy:false,mem:null};let pending=null;
+const AG={url:(SET.agent||'http://127.0.0.1:8765').replace(/\/$/,''),ok:false,bad:false,brain:null,busy:false,mem:null,gui:true,seen:null};let pending=null;
 const tok=()=>store.get('agtoken','');
 async function agent(body){const r=await fetch(AG.url+'/do',{method:'POST',headers:{'Content-Type':'text/plain','X-Jarvis-Token':tok()},body:JSON.stringify(body)});if(r.status===401)throw new Error('token');if(!r.ok)throw new Error('http');return r.json()}
-async function ping(){try{const r=await fetch(AG.url+'/ping',{headers:{'X-Jarvis-Token':tok()}});AG.ok=r.ok;AG.bad=r.status===401;if(r.ok){const j=await r.json();AG.brain=j.brain;AG.mem=j.memory;renderMem()}else AG.brain=null}catch{AG.ok=false;AG.bad=false;AG.brain=null}updLink()}
+async function ping(){const was=AG.ok;try{const r=await fetch(AG.url+'/ping',{headers:{'X-Jarvis-Token':tok()}});AG.ok=r.ok;AG.bad=r.status===401;if(r.ok){const j=await r.json();AG.brain=j.brain;AG.mem=j.memory;AG.gui=j.gui;renderMem()}else AG.brain=null}catch{AG.ok=false;AG.bad=false;AG.brain=null}
+  if(AG.seen!==null&&was!==AG.ok)toast(AG.ok?'Laptop agent connected':'Laptop agent disconnected',AG.ok?'good':'bad');AG.seen=AG.ok;updLink();if(!AG.ok)$('#hud').classList.remove('on')}
 function brainText(){const b=AG.brain;if(!AG.ok)return['Brain: offline','bad'];if(!b.ollama)return['Ollama not running','bad'];if(!b.ready)return['Model missing: '+b.model,'bad'];return['Brain: '+b.model,'good']}
 function updLink(){
   const set=(el,txt,cls)=>{if(!el)return;el.textContent=txt;el.classList.remove('good','bad');el.classList.add(cls)};
@@ -103,12 +136,24 @@ function updLink(){
   const [bt,bc]=brainText();set($('#brainchip'),bt,bc);
   set($('#linkstat'),AG.ok?'Connected ✔':AG.bad?'Wrong token':'Agent not running',AG.ok?'good':'bad');
   set($('#brainstat'),AG.ok?(AG.brain.ollama?(AG.brain.ready?'Ollama ready ✔ ('+AG.brain.model+')':'Ollama running, model "'+AG.brain.model+'" not installed'):'Ollama is not running'):'unknown (agent offline)',bc);
+  renderCheck();
   const hint=$('#brainhint');if(hint)hint.textContent=AG.ok&&AG.brain.ollama&&!AG.brain.ready?'Open a terminal and run: ollama pull '+AG.brain.model:AG.ok&&!AG.brain.ollama?'Start the Ollama app, then wait a few seconds.':'';
 }
+function renderCheck(){const el=$('#check');if(!el)return;const b=AG.brain,rows=[
+  [AG.ok,'Agent running on this laptop',AG.ok?'':'Double-click start_jarvis_agent.bat (Python must be installed).'],
+  [AG.ok&&!AG.bad,'Token accepted',AG.bad?'Wrong token. Paste the one from the agent window.':AG.ok?'':'Needs the agent first.'],
+  [AG.ok&&b&&b.ollama,'Ollama running',AG.ok&&b&&!b.ollama?'Open the Ollama app and wait a few seconds.':''],
+  [AG.ok&&b&&b.ready,'AI model ready'+(b?' ('+b.model+')':''),AG.ok&&b&&b.ollama&&!b.ready?'Run in a terminal:  ollama pull '+b.model:''],
+  [AG.ok&&AG.gui,'Keyboard control (typing, shortcuts)',AG.ok&&!AG.gui?'Run:  pip install pyautogui':'']];
+  el.innerHTML=rows.map(r=>`<div class="crow ${r[0]?'ok':'no'}"><b>${r[0]?'✔':'○'}</b><span>${r[1]}${r[2]?`<small>${r[2]}</small>`:''}</span></div>`).join('')}
 $('#agsave').onclick=async()=>{store.set('agtoken',$('#agtoken').value.trim());await ping();say(AG.ok?'Laptop link established.':AG.bad?'That token is not right.':'I cannot reach the agent. Is it running?')};
 ping();setInterval(ping,12000);
+function onState(s){const h=$('#hud');if(s.stats&&SET.hud&&AG.ok){h.classList.add('on');const set=(id,v,t)=>{$('#'+id).style.width=v+'%';$('#'+id+'t').textContent=t};set('hcpu',s.stats.cpu,s.stats.cpu+'%');set('hram',s.stats.ram,s.stats.ram+'%');
+    const bw=$('#hbatrow');if(s.stats.battery!=null){bw.style.display='';set('hbat',s.stats.battery,s.stats.battery+'%'+(s.stats.plugged?' ⚡':''));$('#hbat').classList.toggle('low',s.stats.battery<20&&!s.stats.plugged)}else bw.style.display='none'}else h.classList.remove('on');
+  (s.alerts||[]).forEach(a=>{chime(660);toast('⏰ '+a.text,'good');say(a.text)})}
+setInterval(async()=>{if(!AG.ok||AG.busy)return;try{const r=await fetch(AG.url+'/state',{headers:{'X-Jarvis-Token':tok()}});if(r.ok)onState(await r.json())}catch{ping()}},2500);
 let poll=null;
-function startPoll(){stopPoll();poll=setInterval(async()=>{try{const r=await fetch(AG.url+'/state',{headers:{'X-Jarvis-Token':tok()}});const s=await r.json();
+function startPoll(){stopPoll();poll=setInterval(async()=>{try{const r=await fetch(AG.url+'/state',{headers:{'X-Jarvis-Token':tok()}});const s=await r.json();onState(s);
   if(s.state==='thinking'){setOrb('think');setStatus('Thinking…',1)}else if(s.state==='executing'){setOrb('exec');setStatus('Working: '+s.detail,1)}}catch{}},350)}
 function stopPoll(){clearInterval(poll);poll=null}
 function showSteps(steps){const el=$('#steps');if(!el)return;if(!steps||!steps.length){el.innerHTML='';return}
@@ -165,9 +210,9 @@ async function local(t){
     if(/\.[a-z]{2,}$/.test(m[1])&&!/\s/.test(m[1]))return tool('open_url',{url:m[1]});
     return openTarget(k)}
   return false}
-let raw0='';
+let raw0='';const HIST=LOG.filter(m=>m.who==='you').map(m=>m.text).slice(-30);let hpos=HIST.length;
 async function run(raw){
-  raw0=raw;
+  raw0=raw;if(raw&&raw.trim()){logMsg('you',raw);HIST.push(raw);hpos=HIST.length}
   const t=raw.toLowerCase().replace(/^(hey |hi |ok |okay )?jarvis[, ]*/,'').replace(/[.?!]+$/,'').trim();
   if(pending){const p=pending;pending=null;hideConfirm();
     if(/^(yes|yeah|yep|yup|sure|confirm|do it|go ahead|proceed)\b/.test(t))return act(p.brain?{action:'confirm',approve:true}:{...p.tool,confirm:true});
@@ -206,6 +251,7 @@ async function run(raw){
   if(!AG.ok)return say("I only know basic commands while my laptop link is offline. Start the agent and connect it, and I can do anything you ask.");
   return act({action:'think',text:raw});
 }
+$('#txt').addEventListener('keydown',e=>{if(e.key==='ArrowUp'&&HIST.length){e.preventDefault();hpos=Math.max(0,hpos-1);e.target.value=HIST[hpos]||''}else if(e.key==='ArrowDown'){e.preventDefault();hpos=Math.min(HIST.length,hpos+1);e.target.value=HIST[hpos]||''}});
 $('#cmd').onsubmit=e=>{e.preventDefault();const v=$('#txt').value;$('#txt').value='';run(v)};
 $$('[data-c]').forEach(b=>b.onclick=()=>run(b.dataset.c));
 setInterval(()=>$('#clock').textContent=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),1000);
@@ -246,13 +292,14 @@ function frame(t){
   requestAnimationFrame(frame)}
 requestAnimationFrame(frame);
 /* ---------- boot ---------- */
-const LINES=['[BOOT] Initializing Jarvis core…','[POWER] Primary power path stable.','[VOICE] Speech engine '+(SR?'online.':'unavailable (type commands).'),'[AUDIO] Voice output '+(synth?'ready.':'unavailable.'),'[COMMAND] Local command bridge handshake accepted.','[AUTOMATION] Loading '+modes.length+' workflow modes…','[SYSTEM] Reading device telemetry…','[PROFILE] Loading local profile.','[SECURITY] Code Red protocol armed.','[GUARD] Stability guard nominal.','[READY] Jarvis is online.'];
+const LINES=['[BOOT] Initializing Jarvis core…','[POWER] Primary power path stable.','[VOICE] Speech engine '+(SR?'online.':'unavailable (type commands).'),'[AUDIO] Voice output '+(synth?'ready.':'unavailable.'),()=>AG.ok?'[AGENT] Laptop agent online, token accepted.':AG.bad?'[AGENT] Agent found but the token is wrong.':'[AGENT] Laptop agent offline. Start it to control your PC.','[AUTOMATION] Loading '+modes.length+' workflow modes…',()=>!AG.ok?'[BRAIN] Waiting for the agent…':!AG.brain.ollama?'[BRAIN] Ollama is not running.':!AG.brain.ready?'[BRAIN] Model missing: '+AG.brain.model:'[BRAIN] Ollama ready: '+AG.brain.model,'[PROFILE] Loading local profile.','[SECURITY] Code Red protocol armed.','[GUARD] Stability guard nominal.','[READY] Jarvis is online.'];
 let bi=0;const con=$('#console'),bc=$('#bc'),bp=$('#bp');
 const bt=setInterval(()=>{bi++;const p=Math.min(100,Math.round(bi/LINES.length*100));bc.style.strokeDashoffset=327*(1-p/100);bp.textContent=p+'%';
-  con.innerHTML=LINES.slice(0,bi).map(l=>l.replace(/^(\[\w+\])/,'<b>$1</b>')).join('<br>');
+  con.innerHTML=LINES.slice(0,bi).map(l=>(typeof l==='function'?l():l).replace(/^(\[\w+\])/,'<b>$1</b>')).join('<br>');
   if(bi>=LINES.length){clearInterval(bt);$('#bootbtn').style.display='block'}},330);
 $('#bootbtn').onclick=()=>{$('#boot').classList.add('hide');setTimeout(()=>$('#boot').remove(),900);
-  if(synth)synth.getVoices();setTimeout(()=>say(greet()),400)};
+  if(synth)synth.getVoices();setTimeout(()=>say(greet()),400);setTimeout(firstRunCheck,2500);if(SET.wake&&rec)setTimeout(()=>startRec('wake'),1500)};
+document.addEventListener('keydown',e=>{if(e.key==='Enter'&&$('#boot')&&$('#bootbtn').style.display==='block')$('#bootbtn').click()});
 if(synth)synth.onvoiceschanged=()=>{};
 
 /* ---------- memory panel ---------- */
@@ -284,3 +331,30 @@ $('#memclear').onclick=async()=>{if(!confirm('Erase everything JARVIS remembers 
       for(let k=0;k<(s==='exec'?3:1);k++){const a0=ph*(s==='exec'?2.5:1.6)+k*Math.PI*2/3;x.beginPath();x.arc(180,180,R+10,a0,a0+.7);x.stroke()}}
     requestAnimationFrame(frame)}
   requestAnimationFrame(frame)})();
+
+/* ---------- rotating hints in the command box ---------- */
+(function(){const H=['Open Chrome, visit YouTube and search for Python tutorials','What’s the weather in Mumbai?','Find my latest PDF','Create a folder named Projects on my desktop','Remind me in 10 minutes to stretch','Set volume to 40','Open Notepad and type hello team','Which apps do I have with “code” in the name?','Take a screenshot'];let i=0;
+  setInterval(()=>{if(document.activeElement.id==='txt')return;$('#txt').placeholder='Try: '+H[i++%H.length]},4000);$('#txt').placeholder='Try: '+H[0]})();
+/* ---------- settings panel ---------- */
+function fillSettings(){const sel=$('#setvoice'),vs=synth?synth.getVoices():[];
+  sel.innerHTML='<option value="">Automatic</option>'+vs.map(v=>`<option value="${esc(v.name)}"${v.name===SET.voice?' selected':''}>${esc(v.name)} (${esc(v.lang)})</option>`).join('');
+  $('#setrate').value=SET.rate;$('#setpitch').value=SET.pitch;$('#setlang').value=SET.lang;$('#setwake').checked=!!SET.wake;$('#sethud').checked=!!SET.hud;$('#setagent').value=SET.agent;
+  $('#ratev').textContent=(+SET.rate).toFixed(2);$('#pitchv').textContent=(+SET.pitch).toFixed(2)}
+if(synth)synth.onvoiceschanged=()=>{if($('#p-settings').classList.contains('open'))fillSettings()};
+$('#setvoice').onchange=e=>{SET.voice=e.target.value;saveSet()};
+$('#setrate').oninput=e=>{SET.rate=+e.target.value;$('#ratev').textContent=SET.rate.toFixed(2);saveSet()};
+$('#setpitch').oninput=e=>{SET.pitch=+e.target.value;$('#pitchv').textContent=SET.pitch.toFixed(2);saveSet()};
+$('#setlang').onchange=e=>{SET.lang=e.target.value;saveSet();if(rec)rec.lang=SET.lang};
+$('#setwake').onchange=e=>setWake(e.target.checked);
+$('#sethud').onchange=e=>{SET.hud=e.target.checked;saveSet();if(!SET.hud)$('#hud').classList.remove('on')};
+$('#setagent').onchange=e=>{SET.agent=e.target.value.trim()||'http://127.0.0.1:8765';saveSet();AG.url=SET.agent.replace(/\/$/,'');ping()};
+$('#settest').onclick=()=>say('Hello. All systems are online. This is how I sound.',{nolog:true});
+$('#logclear').onclick=()=>{LOG.length=0;store.set('log',LOG);HIST.length=0;hpos=0;renderLog()};
+/* ---------- install as an app (PWA) ---------- */
+let deferredInstall=null;
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstall=e;$('#installbtn').style.display=''});
+$('#installbtn').onclick=async()=>{if(!deferredInstall)return;deferredInstall.prompt();await deferredInstall.userChoice;deferredInstall=null;$('#installbtn').style.display='none'};
+if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost')){navigator.serviceWorker.register('sw.js').catch(()=>{})}
+/* ---------- first run: open the setup checklist if something is missing ---------- */
+function firstRunCheck(){if(sessionStorage.getItem('setupShown'))return;
+  const ready=AG.ok&&AG.brain&&AG.brain.ready&&AG.gui;if(!ready){try{sessionStorage.setItem('setupShown','1')}catch{}openPanel('link')}}
