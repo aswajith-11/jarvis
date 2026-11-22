@@ -4,76 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Jarvis Personal AI</title>
-<style>
-:root{--h:180;--c:hsl(var(--h) 100% 55%);--c2:hsl(var(--h) 100% 70%);--dim:hsl(var(--h) 60% 20%);--bg:#020a12;--glass:hsl(var(--h) 80% 12% / .55)}
-body.red{--h:355}
-*{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%;background:var(--bg);color:#cfeff5;font-family:"Segoe UI",system-ui,sans-serif;overflow:hidden}
-button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
-#bg{position:fixed;inset:0;background:radial-gradient(ellipse at 50% 45%,hsl(var(--h) 80% 14%) 0%,#020a12 65%);transition:background .6s}
-canvas#globe{position:fixed;inset:0;width:100%;height:100%}
-/* boot */
-#boot{position:fixed;inset:0;z-index:50;background:#010609;display:flex;align-items:center;justify-content:center;gap:40px;flex-wrap:wrap;transition:opacity .8s}
-#boot.hide{opacity:0;pointer-events:none}
-.bring{position:relative;width:260px;height:260px}
-.bring svg{width:100%;height:100%;transform:rotate(-90deg)}
-.bring .t{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:44px;font-weight:700;color:var(--c2);text-shadow:0 0 18px var(--c)}
-.bring .t small{font-size:11px;letter-spacing:2px;opacity:.7}
-#console{width:min(440px,90vw);height:260px;border:1px solid var(--dim);background:var(--glass);border-radius:10px;padding:12px;font:12px/1.6 ui-monospace,Consolas,monospace;overflow:hidden;color:#7fe9f3}
-#console b{color:#ffd24a}
-#bootbtn{margin-top:14px;padding:10px 26px;border:1px solid var(--c);border-radius:8px;color:var(--c2);box-shadow:0 0 16px var(--dim);display:none}
-#bootwrap{display:flex;flex-direction:column;align-items:center}
-/* top bar */
-#top{position:fixed;top:0;left:0;right:0;height:46px;display:flex;align-items:center;justify-content:space-between;padding:0 14px;z-index:10;background:linear-gradient(#020a12cc,transparent)}
-#top h1{font-size:15px;color:var(--c);letter-spacing:1px;text-shadow:0 0 10px var(--c)}
-.tools{display:flex;gap:6px;align-items:center}
-.tools button,.chip{width:30px;height:30px;border-radius:8px;border:1px solid var(--dim);display:grid;place-items:center;font-size:15px;background:var(--glass)}
-.tools button:hover{border-color:var(--c);box-shadow:0 0 10px var(--c)}
-.chip{width:auto;padding:0 10px;font-size:12px;color:var(--c2)}
-#status{position:fixed;top:56px;left:14px;z-index:10;padding:10px 26px;border:1px solid var(--dim);border-radius:10px;background:var(--glass);color:var(--c2);font-size:13px;min-width:150px;text-align:center}
-#status.on{border-color:var(--c);box-shadow:0 0 18px var(--c)}
-/* side buttons */
-.side{position:fixed;bottom:90px;display:flex;flex-direction:column;gap:12px;z-index:10}
-.side.l{left:16px}.side.r{right:16px}
-.pill{display:flex;align-items:center;gap:10px;padding:9px 20px;border-radius:999px;background:var(--c);color:#012;font-weight:600;font-size:13px;min-width:140px;box-shadow:0 0 18px var(--c),inset 0 0 8px #fff8;transition:.2s}
-.pill:hover{transform:scale(1.06);box-shadow:0 0 30px var(--c2)}
-/* core orb */
-#core{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);width:130px;height:130px;z-index:10;border-radius:50%;display:grid;place-items:center}
-#core .ring{position:absolute;inset:0;border-radius:50%;border:3px solid var(--c);box-shadow:0 0 30px var(--c),inset 0 0 30px var(--dim);animation:spin 12s linear infinite;border-top-color:transparent;border-bottom-color:transparent}
-#core .ring.b{inset:12px;animation-duration:7s;animation-direction:reverse;border-width:2px}
-#core .in{width:72px;height:72px;border-radius:50%;background:radial-gradient(circle,hsl(var(--h) 80% 25%),#021018);border:2px solid var(--c2);display:grid;place-items:center;font-size:11px;letter-spacing:2px;font-weight:700;color:var(--c2);text-shadow:0 0 8px var(--c);animation:pulse 2.4s ease-in-out infinite}
-#core.listen .in{animation-duration:.6s;background:radial-gradient(circle,hsl(var(--h) 100% 40%),#021018)}
-@keyframes spin{to{transform:rotate(360deg)}}
-@keyframes pulse{50%{box-shadow:0 0 34px var(--c)}}
-#mic{position:fixed;right:20%;bottom:150px;width:44px;height:44px;border-radius:50%;background:var(--c);color:#012;font-size:20px;box-shadow:0 0 20px var(--c);z-index:10}
-#code{position:fixed;bottom:56px;left:50%;transform:translateX(-50%);z-index:10;padding:4px 16px;border-radius:999px;background:var(--c);color:#012;font-size:12px;font-weight:600}
-#cmd{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);z-index:10;width:min(460px,70vw);display:flex;gap:6px}
-#cmd input{flex:1;padding:8px 14px;border-radius:999px;border:1px solid var(--dim);background:var(--glass);color:#cfeff5;outline:0;font:13px inherit}
-#cmd input:focus{border-color:var(--c)}
-#reply{position:fixed;top:56px;left:50%;transform:translateX(-50%);max-width:min(520px,90vw);z-index:10;text-align:center;color:var(--c2);font-size:14px;text-shadow:0 0 8px var(--c);pointer-events:none}
-/* panels */
-.panel{position:fixed;inset:46px 0 0 0;z-index:30;background:#020a12ee;padding:24px;overflow:auto;display:none}
-.panel.open{display:block}
-.panel h2{color:var(--c);letter-spacing:2px;font-size:16px;margin-bottom:16px;display:flex;gap:12px;align-items:center}
-.panel h2 button{border:1px solid var(--dim);border-radius:8px;padding:4px 12px;font-size:13px;color:var(--c2)}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
-.card{border:1px solid var(--dim);background:var(--glass);border-radius:12px;padding:16px}
-.card h3{color:var(--c2);font-size:15px;margin-bottom:6px}
-.card p{font-size:13px;opacity:.8;margin-bottom:10px}
-.card .btn{padding:6px 14px;border-radius:8px;border:1px solid var(--c);color:var(--c2);font-size:12px;margin-right:6px}
-.card input,.card textarea{width:100%;margin:4px 0 8px;padding:7px 10px;border-radius:8px;border:1px solid var(--dim);background:#00000055;color:#cfeff5;font:13px inherit}
-.big{font-size:44px;color:var(--c2);text-shadow:0 0 14px var(--c)}
-.bar{height:14px;border-radius:8px;background:#0006;overflow:hidden;border:1px solid var(--dim)}
-.bar i{display:block;height:100%;background:linear-gradient(90deg,#1ee88a,#7dffb8);transition:width .6s}
-/* code red */
-#red{position:fixed;inset:0;z-index:60;background:#0a0204;display:none;flex-direction:column;align-items:center;justify-content:center;color:#ff3b4d;text-align:center}
-#red.on{display:flex}
-#red .rr{width:200px;height:200px;border-radius:50%;border:3px solid #ff3b4d;box-shadow:0 0 50px #ff3b4d,inset 0 0 40px #7a0010;display:grid;place-items:center;animation:pulse 1s infinite;margin:20px;font-weight:700;letter-spacing:3px}
-#red h1{letter-spacing:12px;font-size:26px;text-shadow:0 0 14px #f00}
-#red p{font-size:12px;letter-spacing:3px;opacity:.8}
-#red button{margin-top:20px;padding:8px 22px;border:1px solid #ff3b4d;border-radius:8px;color:#ff7a88}
-@media(max-width:700px){.side{bottom:150px}.pill{min-width:0;padding:8px 12px;font-size:12px}#mic{right:50%;bottom:230px;transform:translateX(50%)}.side.r{right:8px}.side.l{left:8px}#core{bottom:130px}}
-</style>
+<meta name="theme-color" content="#020a12">
+<meta name="description" content="JARVIS: a voice-enabled personal AI that controls your laptop. Local Ollama brain, no cloud AI.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div id="bg"></div>
@@ -95,20 +31,26 @@ canvas#globe{position:fixed;inset:0;width:100%;height:100%}
 <div id="top">
   <h1>Jarvis Personal AI</h1>
   <div class="tools">
+    <span class="chip" id="agchip">● Agent offline</span><span class="chip brain" id="brainchip">Brain: –</span><span class="chip" id="wakechip" style="display:none"></span>
     <span class="chip" id="clock">--:--</span>
-    <button title="Laptop link" data-p="link" id="linkbtn">💻</button>
-    <button title="Battery" data-p="battery">🔋</button>
-    <button title="System info" data-p="sys">🖥</button>
-    <button title="Automations" data-p="auto">⚡</button>
-    <button title="Quotes" data-p="quotes">❝</button>
-    <button title="Profile" data-p="profile">👤</button>
+    <button title="Stop (Esc)" id="stopbtn">■</button>
+    <button title="Wake word: say “Jarvis…”" id="wakebtn">🎧</button>
+    <button title="Conversation" data-p="log">💬</button>
+    <button title="Laptop link &amp; setup" data-p="link" id="linkbtn">💻</button>
+    <button title="Memory" data-p="memory">🧠</button>
+    <button title="Settings" data-p="settings">⚙</button>
+    <button title="Install as app" id="installbtn" style="display:none">⬇</button>
     <button title="Mute voice" id="mute">🔊</button>
     <button title="Code Red" id="redbtn" style="color:#ff4d5e">▲</button>
   </div>
 </div>
 
+<div id="hud"><div class="m"><span>CPU</span><i><b id="hcpu"></b></i><em id="hcput">–</em></div><div class="m"><span>RAM</span><i><b id="hram"></b></i><em id="hramt">–</em></div><div class="m" id="hbatrow"><span>BAT</span><i><b id="hbat"></b></i><em id="hbatt">–</em></div></div>
+<div id="toasts"></div>
 <div id="status">Jarvis Ready</div>
 <div id="reply"></div>
+<div id="steps"></div>
+<div id="confirmbar"><span id="ctext"></span><button id="cyes">Yes</button><button id="cno">No</button></div>
 
 <div class="side l">
   <button class="pill" data-c="greeting">◔ Greeting</button>
@@ -124,7 +66,7 @@ canvas#globe{position:fixed;inset:0;width:100%;height:100%}
 </div>
 
 <button id="mic" title="Speak">🎙</button>
-<div id="core"><div class="ring"></div><div class="ring b"></div><div class="in">JARVIS</div></div>
+<div id="core" data-state="idle"><canvas id="orbwave" width="360" height="360"></canvas><div class="bezel"></div><div class="ring"></div><div class="ring b"></div><div class="in">JARVIS</div></div>
 <button id="code" data-c="code red">⛨ Activate Code Red</button>
 <form id="cmd"><input id="txt" placeholder="Type a command… e.g. open youtube, search black holes, start work mode" autocomplete="off"></form>
 
@@ -142,269 +84,45 @@ canvas#globe{position:fixed;inset:0;width:100%;height:100%}
 
 <section class="panel" id="p-quotes"><h2><button data-close>←</button>QUOTES</h2><div class="card" style="max-width:640px"><div id="qtext" style="font-size:20px;line-height:1.5"></div><p id="qby" style="margin-top:10px"></p><button class="btn" id="qnext" style="padding:6px 14px;border:1px solid var(--c);border-radius:8px;color:var(--c2)">Next quote</button></div></section>
 
-<section class="panel" id="p-link"><h2><button data-close>←</button>LAPTOP LINK</h2>
-  <div class="card" style="max-width:560px"><h3>Status: <span id="linkstat">checking…</span></h3>
-  <p>Jarvis needs the small helper program <b>agent.py</b> running on your laptop to open apps and control it. Double-click <b>start_jarvis_agent.bat</b>, then paste the secret token it shows.</p>
-  <input id="agtoken" placeholder="Paste token from the agent window" autocomplete="off">
-  <button class="btn" id="agsave">Save &amp; connect</button>
-  <p style="margin-top:12px;font-size:12px">Try: “open spotify”, “open chrome”, “type hello world”, “press ctrl s”, “volume 40”, “mute”, “next song”, “take a screenshot”, “open downloads”, “find file resume”, “lock the laptop”, “run command ipconfig”.</p></div></section>
+<section class="panel" id="p-link"><h2><button data-close>←</button>SETUP &amp; LAPTOP LINK</h2>
+  <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(310px,1fr));max-width:980px">
+  <div class="card"><h3>Status checklist</h3><div id="check"></div>
+    <p style="margin-top:10px;font-size:12px">Agent: <span id="linkstat" class="st">checking…</span> · Brain: <span id="brainstat" class="st">unknown</span></p><p id="brainhint" style="color:#ffd24a;font-size:12px"></p></div>
+  <div class="card"><h3>1 · Get the agent</h3>
+    <p>JARVIS controls your PC through a small helper program running on your laptop. Download it, unzip, and double-click <b>start_jarvis_agent.bat</b>. It opens this page already connected.</p>
+    <a class="btn" href="https://github.com/aswajith-11/jarvis/archive/refs/heads/main.zip" target="_blank" rel="noopener" style="display:inline-block;text-decoration:none">⬇ Download agent (zip)</a>
+    <h3 style="margin-top:14px">2 · Not connected? Paste the token</h3>
+    <input id="agtoken" placeholder="Token printed in the agent window" autocomplete="off">
+    <button class="btn" id="agsave">Save &amp; connect</button>
+    <p style="margin-top:10px;font-size:12px">The token stays in this browser and on your laptop. Never put it on GitHub.</p></div>
+  <div class="card"><h3>3 · The AI brain (Ollama)</h3>
+    <p>Jarvis thinks locally with <b>Ollama</b>: no cloud AI, no API key, no cost. Everyday commands run instantly without the model.</p>
+    <p style="font-size:12px">Better model: <code>ollama pull llama3.2:3b</code>, then put <code>{"model":"llama3.2:3b"}</code> in <code>~/.jarvis/config.json</code> and restart the agent.</p></div></div></section>
+
+<section class="panel" id="p-log"><h2><button data-close>←</button>CONVERSATION <button id="logclear">Clear</button></h2>
+  <div id="logview" class="card" style="max-width:720px;max-height:68vh;overflow:auto"></div></section>
+
+<section class="panel" id="p-settings"><h2><button data-close>←</button>SETTINGS</h2>
+  <div class="card" style="max-width:560px">
+    <label class="srow">Voice<select id="setvoice"></select></label>
+    <label class="srow">Speed <span id="ratev"></span><input id="setrate" type="range" min="0.6" max="1.6" step="0.05"></label>
+    <label class="srow">Pitch <span id="pitchv"></span><input id="setpitch" type="range" min="0.5" max="1.5" step="0.05"></label>
+    <label class="srow">Speech recognition language<select id="setlang"><option value="en-IN">English (India)</option><option value="en-US">English (US)</option><option value="en-GB">English (UK)</option><option value="hi-IN">Hindi</option><option value="ta-IN">Tamil</option><option value="ml-IN">Malayalam</option><option value="te-IN">Telugu</option></select></label>
+    <label class="srow chk"><input id="setwake" type="checkbox"> Wake word: always listen for “Jarvis…” (Chrome/Edge)</label>
+    <label class="srow chk"><input id="sethud" type="checkbox"> Show live CPU / RAM / battery</label>
+    <label class="srow">Agent address<input id="setagent" placeholder="http://127.0.0.1:8765"></label>
+    <button class="btn" id="settest" style="margin-top:8px">▶ Test voice</button>
+    <p style="font-size:12px;opacity:.7;margin-top:10px">Shortcuts: Space = talk · Esc = stop · Ctrl+K or / = type · ↑ ↓ = command history</p>
+  </div></section>
+
+<section class="panel" id="p-memory"><h2><button data-close>←</button>MEMORY <button id="memclear">Erase all</button></h2>
+  <p style="opacity:.75;font-size:13px;margin-bottom:12px;max-width:620px">Everything here is stored only on your laptop (~/.jarvis/memory.json). I never save passwords or card numbers.</p>
+  <div class="card" style="max-width:620px" id="memview"></div></section>
 
 <section class="panel" id="p-profile"><h2><button data-close>←</button>PROFILE</h2><div class="card" style="max-width:420px"><h3>Who should I call you?</h3><input id="pname" placeholder="Your name"><input id="pcity" placeholder="City (for the greeting)"><button class="btn" id="psave">Save</button></div></section>
 
 <div id="red"><h1>CODE RED</h1><p>EMERGENCY COMMAND ENVIRONMENT</p><div class="rr">JARVIS</div><p>WARNING. CODE RED AUTHORIZATION ACCEPTED.</p><button id="redoff">STAND DOWN</button></div>
 
-<script>
-const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
-const store={get(k,d){try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}}};
-let muted=store.get('muted',false);
-/* ---------- speech ---------- */
-const synth=window.speechSynthesis;
-function say(t){
-  $('#reply').textContent=t; clearTimeout(say.t); say.t=setTimeout(()=>$('#reply').textContent='',9000);
-  if(muted||!synth)return;
-  synth.cancel(); const u=new SpeechSynthesisUtterance(t);
-  const v=synth.getVoices().find(v=>/en-(GB|US)/.test(v.lang)&&/male|daniel|google uk english male|david/i.test(v.name))||synth.getVoices().find(v=>/^en/.test(v.lang));
-  if(v)u.voice=v; u.rate=1; u.pitch=.9;
-  u.onstart=()=>setStatus('Speaking…',1); u.onend=()=>setStatus('Jarvis Ready');
-  synth.speak(u);
-}
-function setStatus(t,on){const s=$('#status');s.textContent=t;s.classList.toggle('on',!!on)}
-$('#mute').onclick=()=>{muted=!muted;store.set('muted',muted);$('#mute').textContent=muted?'🔇':'🔊';if(muted)synth&&synth.cancel()};
-$('#mute').textContent=muted?'🔇':'🔊';
-const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-let rec,listening=false;
-if(SR){rec=new SR();rec.lang='en-US';rec.interimResults=false;
-  rec.onstart=()=>{listening=true;$('#core').classList.add('listen');setStatus('Listening…',1)};
-  rec.onend=()=>{listening=false;$('#core').classList.remove('listen');if($('#status').textContent==='Listening…')setStatus('Jarvis Ready')};
-  rec.onresult=e=>{const t=e.results[0][0].transcript;$('#reply').textContent='“'+t+'”';run(t)};
-  rec.onerror=e=>{say(e.error==='not-allowed'?'Microphone permission was denied.':'I did not catch that.')};
-}
-function toggleMic(){ if(!rec){say('Voice input is not supported in this browser. Use Chrome or Edge, or type a command.');return}
-  if(listening)rec.stop();else{try{synth&&synth.cancel();rec.start()}catch{}}}
-$('#mic').onclick=toggleMic; $('#core').onclick=toggleMic;
-document.addEventListener('keydown',e=>{if(e.code==='Space'&&document.activeElement.tagName!=='INPUT'&&document.activeElement.tagName!=='TEXTAREA'){e.preventDefault();toggleMic()}});
-/* ---------- data ---------- */
-const QUOTES=[["The best way to predict the future is to invent it.","Alan Kay"],["Stay hungry, stay foolish.","Steve Jobs"],["Whether you think you can, or you think you can't — you're right.","Henry Ford"],["Genius is one percent inspiration and ninety-nine percent perspiration.","Thomas Edison"],["Sometimes you gotta run before you can walk.","Tony Stark"],["It always seems impossible until it's done.","Nelson Mandela"],["Simplicity is the ultimate sophistication.","Leonardo da Vinci"]];
-let qi=0;
-function showQuote(){const q=QUOTES[qi%QUOTES.length];$('#qtext').textContent='“'+q[0]+'”';$('#qby').textContent='— '+q[1];return q}
-$('#qnext').onclick=()=>{qi++;const q=showQuote();say(q[0]+' '+q[1])};
-const DEF_MODES=[
- {n:'Work Mode',d:'Open your core work sites and get productive.',links:['https://mail.google.com','https://calendar.google.com','https://github.com']},
- {n:'Focus Mode',d:'Open notes and cut distractions.',links:['https://www.google.com/search?q=pomodoro+timer']},
- {n:'Study Mode',d:'Prepare a simple study workspace.',links:['https://www.khanacademy.org','https://www.wikipedia.org']},
- {n:'Research Mode',d:'Start a web search for deep research.',links:['https://scholar.google.com','https://www.wikipedia.org']},
- {n:'Planning Mode',d:'Open planning tools.',links:['https://calendar.google.com','https://keep.google.com']},
- {n:'Creative Mode',d:'Open a blank space and some inspiration.',links:['https://www.pinterest.com','https://dribbble.com']}];
-let modes=store.get('modes',DEF_MODES);
-function renderModes(){
-  $('#modes').innerHTML=modes.map((m,i)=>`<div class="card"><h3>${esc(m.n)}</h3><p>${esc(m.d)}</p><p style="font-size:11px">say: <b>start ${esc(m.n.toLowerCase())}</b> · ${m.links.length} link(s)</p><button class="btn" data-run="${i}">Run</button><button class="btn" data-edit="${i}">Edit</button><button class="btn" data-del="${i}">Delete</button></div>`).join('');
-}
-const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-function runMode(m){say('Starting '+m.n+'. Opening '+m.links.length+' link'+(m.links.length==1?'':'s')+'.');m.links.forEach((u,i)=>setTimeout(()=>window.open(u,'_blank','noopener'),i*250))}
-$('#modes').onclick=e=>{const b=e.target.closest('button');if(!b)return;
-  if(b.dataset.run!=null)runMode(modes[b.dataset.run]);
-  if(b.dataset.del!=null&&confirm('Delete this mode?')){modes.splice(b.dataset.del,1);store.set('modes',modes);renderModes()}
-  if(b.dataset.edit!=null)editMode(+b.dataset.edit)};
-function editMode(i){const m=modes[i];const n=prompt('Mode name',m.n);if(!n)return;
-  const l=prompt('Website links (comma separated)',m.links.join(', '));if(l===null)return;
-  m.n=n;m.links=l.split(',').map(s=>s.trim()).filter(Boolean).map(u=>/^https?:/.test(u)?u:'https://'+u);store.set('modes',modes);renderModes()}
-$('#newmode').onclick=()=>{const n=prompt('New mode name');if(!n)return;const l=prompt('Website links (comma separated)','github.com');if(l===null)return;
-  modes.push({n,d:'Custom mode.',links:l.split(',').map(s=>s.trim()).filter(Boolean).map(u=>/^https?:/.test(u)?u:'https://'+u)});store.set('modes',modes);renderModes()};
-renderModes();
-/* ---------- panels ---------- */
-function openPanel(id){closePanels();$('#p-'+id).classList.add('open');if(id==='battery')battery();if(id==='sys')sysinfo();if(id==='quotes')showQuote();if(id==='link'){$('#agtoken').value=store.get('agtoken','');ping()}if(id==='profile'){$('#pname').value=store.get('name','');$('#pcity').value=store.get('city','')}}
-function closePanels(){$$('.panel').forEach(p=>p.classList.remove('open'))}
-$$('[data-close]').forEach(b=>b.onclick=closePanels);
-$$('[data-p]').forEach(b=>b.onclick=()=>openPanel(b.dataset.p));
-$('#psave').onclick=()=>{store.set('name',$('#pname').value.trim());store.set('city',$('#pcity').value.trim());say('Profile saved.');closePanels()};
-let batt=null;
-if(navigator.getBattery)navigator.getBattery().then(b=>{batt=b;['levelchange','chargingchange'].forEach(ev=>b.addEventListener(ev,battery))});
-function battery(){
-  if(!batt){$('#bl').textContent='N/A';$('#bs').textContent='Unavailable';$('#bt').textContent='This browser does not expose battery data.';return null}
-  const p=Math.round(batt.level*100);$('#bl').textContent=p+'%';$('#bbar').style.width=p+'%';
-  $('#bs').textContent=batt.charging?'Charging':'On battery';
-  const sec=batt.charging?batt.chargingTime:batt.dischargingTime;
-  $('#bt').textContent=isFinite(sec)&&sec>0?`About ${Math.round(sec/60)} min ${batt.charging?'to full':'remaining'}.`:'';
-  return p}
-function sysinfo(){
-  const c=navigator.connection||{};
-  const rows=[['Platform',navigator.userAgentData?.platform||navigator.platform],['CPU threads',navigator.hardwareConcurrency||'?'],['Memory (approx)',navigator.deviceMemory?navigator.deviceMemory+' GB':'n/a'],['Screen',screen.width+'×'+screen.height],['Language',navigator.language],['Network',navigator.onLine?('Online'+(c.effectiveType?' · '+c.effectiveType:'')):'Offline'],['Time zone',Intl.DateTimeFormat().resolvedOptions().timeZone],['Browser',navigator.userAgent.match(/(Edg|Chrome|Firefox|Safari)\/[\d.]+/)?.[0]||'?']];
-  $('#sysgrid').innerHTML=rows.map(r=>`<div class="card"><h3>${r[0]}</h3><div style="font-size:20px;color:var(--c2)">${esc(r[1])}</div></div>`).join('');return rows}
-/* ---------- themes / code red ---------- */
-const HUES=[180,265,140,38,210];let hi=0;
-function nextBg(){hi=(hi+1)%HUES.length;document.documentElement.style.setProperty('--h',HUES[hi]);say('Background theme changed.')}
-function codeRed(on){$('#red').classList.toggle('on',on);document.body.classList.toggle('red',on);
-  if(on){say('Warning. Code Red authorization accepted.');beep()}else say('Standing down. Back to normal.')}
-$('#redbtn').onclick=()=>codeRed(true);$('#redoff').onclick=()=>codeRed(false);
-function beep(){try{const a=new AudioContext(),o=a.createOscillator(),g=a.createGain();o.type='square';o.frequency.value=520;g.gain.value=.05;o.connect(g);g.connect(a.destination);o.start();
-  let t=0;const iv=setInterval(()=>{o.frequency.value=t++%2?520:760;if(t>8){clearInterval(iv);o.stop();a.close()}},220)}catch{}}
-/* ---------- brain: command router ---------- */
-const SITES={youtube:'https://www.youtube.com',google:'https://www.google.com',github:'https://github.com',gmail:'https://mail.google.com',whatsapp:'https://web.whatsapp.com',instagram:'https://www.instagram.com',twitter:'https://x.com',x:'https://x.com',facebook:'https://www.facebook.com',linkedin:'https://www.linkedin.com',netflix:'https://www.netflix.com',spotify:'https://open.spotify.com',maps:'https://maps.google.com',chatgpt:'https://chatgpt.com',claude:'https://claude.ai',reddit:'https://www.reddit.com',amazon:'https://www.amazon.in',wikipedia:'https://www.wikipedia.org'};
-function greet(){const h=new Date().getHours(),n=store.get('name','');return (h<12?'Good morning':h<17?'Good afternoon':'Good evening')+(n?', '+n:'')+'. All systems are online. How can I help?'}
-/* ---------- laptop agent link ---------- */
-const AG={url:'http://127.0.0.1:8765',ok:false};let pending=null;
-async function agent(body){const r=await fetch(AG.url+'/do',{method:'POST',headers:{'Content-Type':'text/plain','X-Jarvis-Token':store.get('agtoken','')},body:JSON.stringify(body)});if(r.status===401)throw new Error('token');return r.json()}
-async function ping(){try{const r=await fetch(AG.url+'/ping',{headers:{'X-Jarvis-Token':store.get('agtoken','')}});AG.ok=r.ok;AG.bad=r.status===401}catch{AG.ok=false;AG.bad=false}updLink()}
-function updLink(){const s=$('#linkstat');if(s){s.textContent=AG.ok?'Connected ✔':AG.bad?'Wrong token':'Agent not running';s.style.color=AG.ok?'#4dff9a':'#ff8a8a'}const b=$('#linkbtn');if(b)b.style.boxShadow=AG.ok?'0 0 10px #4dff9a':'none'}
-$('#agsave').onclick=async()=>{store.set('agtoken',$('#agtoken').value.trim());await ping();say(AG.ok?'Laptop link established. I now have control.':AG.bad?'That token is not right.':'I cannot reach the agent. Is it running?')};
-ping();setInterval(ping,15000);
-async function act(body,okmsg){
-  if(!AG.ok){say('My laptop link is offline. Start the agent on your laptop, then enter the token in the Laptop panel.');return true}
-  try{const r=await agent(body);if(r.needs_confirm){pending=body;say(r.message+' Say yes to confirm, or no to cancel.');return true}say(r.message||okmsg||'Done.')}
-  catch(e){say(e.message==='token'?'The agent rejected my token.':'I lost contact with your laptop.');ping()}
-  return true}
-async function local(t){
-  let m;
-  if(m=t.match(/^(?:set )?volume(?: to)? (\d{1,3})/))return act({action:'volume',level:+m[1]});
-  if(/^(volume up|louder|turn it up|increase volume)/.test(t))return act({action:'volume',direction:'up'});
-  if(/^(volume down|quieter|turn it down|decrease volume|lower the volume)/.test(t))return act({action:'volume',direction:'down'});
-  if(/^(mute|unmute)/.test(t))return act({action:'volume',direction:'mute'});
-  if(/^(next (song|track)|skip)/.test(t))return act({action:'media',key:'next'});
-  if(/^(previous|last) (song|track)/.test(t))return act({action:'media',key:'prev'});
-  if(/^(pause|resume|play|stop)( the)?( music| song| video| media)?$/.test(t)&&!/^stop$/.test(t))return act({action:'media',key:'play'});
-  if(/screenshot|screen shot|capture (the )?screen/.test(t))return act({action:'screenshot'});
-  if(/^lock/.test(t))return act({action:'lock'});
-  if(/^(go to )?sleep|put (the )?(laptop|pc|computer) to sleep/.test(t))return act({action:'sleep'});
-  if(/cancel (the )?(shutdown|restart)/.test(t))return act({action:'cancel'});
-  if(/^(shut ?down|turn off)( the)?( laptop| pc| computer)?$/.test(t))return act({action:'shutdown'});
-  if(/^restart|^reboot/.test(t))return act({action:'restart'});
-  if(/^(sign|log) ?out/.test(t))return act({action:'logoff'});
-  if(/show (the )?desktop|minimi[sz]e (all|everything)/.test(t))return act({action:'show_desktop'});
-  if(/switch (the )?(window|app)/.test(t))return act({action:'switch_window'});
-  if(m=t.match(/^(?:type|write|dictate)\s+(.+)/))return act({action:'type',text:raw0.replace(/^\s*(?:hey |hi |ok |okay )?jarvis[, ]*/i,'').replace(/^(type|write|dictate)\s+/i,'')});
-  if(m=t.match(/^press\s+(.+)/))return act({action:'press',keys:m[1]});
-  if(/^(?:run )?(?:the )?(?:command|cmd)\s+\S/.test(t))return act({action:'run_cmd',cmd:raw0.replace(/^.*?\b(?:command|cmd)\s+/i,'')});
-  if(m=t.match(/^(?:open|show) (?:my |the )?(desktop|documents|downloads|pictures|music|videos|home)(?: folder)?$/))return act({action:'open_folder',name:m[1]});
-  if(m=t.match(/^(?:find|search for|locate) (?:the )?file\s+(.+)/))return act({action:'find_file',query:m[1]});
-  if(m=t.match(/^open file\s+(.+)/))return act({action:'find_file',query:m[1],open:true});
-  if(m=t.match(/^(?:close|quit|kill|exit)\s+(.+)/))return act({action:'close_app',name:m[1]});
-  if(AG.ok&&(m=t.match(/^(?:open|launch|start|run)\s+(.+)/))){
-    const k=m[1].replace(/\.com$/,'').trim();
-    if(/ mode$/.test(k)||modes.some(x=>x.n.toLowerCase().replace(' mode','')===k))return false;
-    if(SITES[k]){try{const r=await agent({action:'open_app',name:k});if(/could not find/.test(r.message||'')){await agent({action:'open_url',url:SITES[k]});say('Opening '+k+' in your browser.')}else say(r.message)}catch{say('I lost contact with your laptop.');ping()}return true}
-    if(/\.[a-z]{2,}$/.test(m[1])&&!/\s/.test(m[1]))return act({action:'open_url',url:'https://'+m[1]});
-    return act({action:'open_app',name:k})}
-  return false}
-let raw0='';
-async function run(raw){
-  raw0=raw;
-  const t=raw.toLowerCase().replace(/^(hey |hi |ok |okay )?jarvis[, ]*/,'').replace(/[.?!]+$/,'').trim();
-  if(pending){const p=pending;if(/^(yes|yeah|yep|confirm|do it|go ahead|proceed)/.test(t)){pending=null;return act({...p,confirm:true})}if(/^(no|nope|cancel|stop|abort)/.test(t)){pending=null;return say('Cancelled.')}pending=null}
-  if(!t){say(greet());return}
-  if(!/^(hello|hi|hey|code red|stand down|what time|what's the time)/.test(t)&&await local(t))return;
-  let m;
-  if(/^(hello|hi|hey|greeting|good (morning|evening|afternoon))/.test(t))return say(greet());
-  if(/code red/.test(t)&&!/(off|stand down)/.test(t))return codeRed(true);
-  if(/stand down|code red off|all clear/.test(t))return codeRed(false);
-  if(/your name|who are you/.test(t))return say('I am Jarvis, your personal assistant, running right here in your browser.');
-  if(/how are you/.test(t))return say('Fully operational, and ready for your next order.');
-  if(/\btime\b/.test(t))return say('It is '+new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})+'.');
-  if(/\bdate\b|what day|today/.test(t))return say('Today is '+new Date().toLocaleDateString([],{weekday:'long',day:'numeric',month:'long',year:'numeric'})+'.');
-  if(/battery|charge/.test(t)){const p=battery();openPanel('battery');return say(p==null?'Battery information is not available in this browser.':`Battery is at ${p} percent and ${batt.charging?'charging':'running on battery'}.`)}
-  if(/system info|system status|my (pc|system|computer)/.test(t)){const r=sysinfo();openPanel('sys');return say(`You have ${r[1][1]} CPU threads${navigator.deviceMemory?' and about '+navigator.deviceMemory+' gigabytes of memory':''}. Network is ${navigator.onLine?'online':'offline'}.`)}
-  if(/profile/.test(t))return(openPanel('profile'),say('Opening your profile.'));
-  if(/quote|inspire|motivat/.test(t)){qi=Math.floor(Math.random()*QUOTES.length);openPanel('quotes');const q=showQuote();return say(q[0]+' — '+q[1])}
-  if(/background|theme|colou?r/.test(t))return nextBg();
-  if(/automation/.test(t))return(openPanel('auto'),say('Here are your automations.'));
-  if(/^launch|launcher/.test(t)&&!/mode/.test(t)){openPanel('auto');return say('Pick a mode to launch, or say start work mode.')}
-  if(m=t.match(/(?:start|run|activate|launch|begin)\s+(.+?)(?:\s+mode)?$/)){const k=m[1].replace(/ mode$/,'');const md=modes.find(x=>x.n.toLowerCase().replace(' mode','')===k.trim());if(md)return runMode(md)}
-  if(m=t.match(/^(?:search|google|look up|find)(?: for)?\s+(.+)/))return(say('Searching for '+m[1]+'.'),window.open('https://www.google.com/search?q='+encodeURIComponent(m[1]),'_blank','noopener'));
-  if(m=t.match(/^(?:play|youtube)\s+(.+)/))return(say('Playing '+m[1]+' on YouTube.'),window.open('https://www.youtube.com/results?search_query='+encodeURIComponent(m[1]),'_blank','noopener'));
-  if(m=t.match(/^(?:open|go to|visit)\s+(.+)/)){const k=m[1].replace(/\.com$/,'').trim();
-    if(SITES[k])return(say('Opening '+k+'.'),window.open(SITES[k],'_blank','noopener'));
-    if(/\./.test(m[1]))return(say('Opening '+m[1]+'.'),window.open('https://'+m[1].replace(/\s/g,''),'_blank','noopener'));
-    return say("I can open websites, not desktop apps, from a browser. Try 'open youtube' or say a full address.")}
-  if(m=t.match(/^(?:calculate|what is|what's)\s+([\d\s+\-*/().x%^]+)$/)){try{const v=Function('"use strict";return ('+m[1].replace(/x/g,'*').replace(/\^/g,'**')+')')();return say('That equals '+v+'.')}catch{}}
-  if(/weather/.test(t)){const c=store.get('city','');window.open('https://www.google.com/search?q=weather'+(c?'+'+encodeURIComponent(c):''),'_blank','noopener');return say('Pulling up the weather.')}
-  if(/joke/.test(t)){const j=['I would tell you a UDP joke, but you might not get it.','There are 10 kinds of people: those who understand binary and those who do not.','Why do programmers prefer dark mode? Because light attracts bugs.'];return say(j[Math.floor(Math.random()*j.length)])}
-  if(/thank/.test(t))return say('Always a pleasure.');
-  return askAI(raw);
-}
-
-const aiHistory=store.get('aiHistory',[]);
-async function askAI(raw){
-  if(!AG.ok){say('Connect your laptop agent first. Open the Laptop Link panel and enter the token from start_jarvis_agent.bat.');return}
-  const messages=[...aiHistory,{role:'user',content:String(raw).slice(0,2000)}];
-  setStatus('Thinking…',1);
-  try{
-    const response=await fetch(AG.url+'/ask',{method:'POST',
-      headers:{'Content-Type':'text/plain','X-Jarvis-Token':store.get('agtoken','')},
-      body:JSON.stringify({messages})});
-    if(response.status===401)throw new Error('token');
-    const plan=await response.json();
-    if(plan.type==='error')throw new Error(plan.message||'AI request failed');
-    aiHistory.push({role:'user',content:String(raw).slice(0,2000)});
-    if(plan.type==='action'){
-      aiHistory.push({role:'assistant',content:'I planned an approved laptop action.'});
-      store.set('aiHistory',aiHistory.slice(-12));
-      setStatus('Executing…',1);
-      await act(plan.action,'Done.');
-      return;
-    }
-    if(plan.type==='search'){
-      const q=String(plan.query||raw).slice(0,300);
-      aiHistory.push({role:'assistant',content:plan.reply||('Searching the web for '+q+'.')});
-      store.set('aiHistory',aiHistory.slice(-12));
-      say(plan.reply||('Searching the web for '+q+'.'));
-      window.open('https://www.google.com/search?q='+encodeURIComponent(q),'_blank','noopener');
-      return;
-    }
-    const reply=String(plan.reply||'I could not form a useful response.').slice(0,1800);
-    aiHistory.push({role:'assistant',content:reply});
-    store.set('aiHistory',aiHistory.slice(-12));
-    say(reply);
-  }catch(e){
-    say(e.message==='token'?'The laptop agent rejected your token.':e.message||'I could not reach the local AI.');
-  }finally{setStatus('Jarvis Ready')}
-}
-$('#cmd').onsubmit=e=>{e.preventDefault();const v=$('#txt').value;$('#txt').value='';run(v)};
-$$('[data-c]').forEach(b=>b.onclick=()=>run(b.dataset.c));
-setInterval(()=>$('#clock').textContent=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),1000);
-/* ---------- globe ---------- */
-const cv=$('#globe'),cx=cv.getContext('2d');let W,H,DPR;
-function size(){DPR=Math.min(devicePixelRatio||1,2);W=cv.width=innerWidth*DPR;H=cv.height=innerHeight*DPR}
-addEventListener('resize',size);size();
-const PTS=[];const N=2200;
-const land=(la,lo)=>Math.sin(la*3+1)*Math.cos(lo*2.3)+Math.sin(lo*4+la*2)*.6+Math.cos(la*5-lo*3)*.35>.35;
-for(let i=0;i<N;i++){const y=1-2*(i+.5)/N,r=Math.sqrt(1-y*y),th=i*2.399963;
-  const la=Math.asin(y),lo=th%(Math.PI*2);PTS.push({x:Math.cos(th)*r,y,z:Math.sin(th)*r,L:land(la,lo)})}
-const STARS=Array.from({length:140},()=>({x:Math.random(),y:Math.random(),s:Math.random()*1.5+.3,p:Math.random()*6}));
-const RINGS=Array.from({length:6},(_,i)=>({a:Math.random()*3,b:.25+Math.random()*.5,rot:Math.random()*6,sp:(Math.random()-.5)*.004,ph:Math.random()*6,k:1.15+i*.04}));
-let rot=0;
-function frame(t){
-  cx.clearRect(0,0,W,H);
-  const hue=getComputedStyle(document.documentElement).getPropertyValue('--h')||180;
-  const h=document.body.classList.contains('red')?355:+hue;
-  const col=(a,l=60)=>`hsla(${h},100%,${l}%,${a})`;
-  STARS.forEach(s=>{cx.fillStyle=col(.3+.3*Math.sin(t/900+s.p),80);cx.fillRect(s.x*W,s.y*H,s.s*DPR,s.s*DPR)});
-  const R=Math.min(W,H)*.3,X=W/2,Y=H*.46;rot+=.003;
-  const g=cx.createRadialGradient(X,Y,R*.6,X,Y,R*1.35);g.addColorStop(0,col(.18,40));g.addColorStop(1,col(0));cx.fillStyle=g;cx.beginPath();cx.arc(X,Y,R*1.35,0,7);cx.fill();
-  cx.strokeStyle=col(.35);cx.lineWidth=1.5*DPR;cx.beginPath();cx.arc(X,Y,R,0,7);cx.stroke();
-  const tilt=.4,ct=Math.cos(tilt),st=Math.sin(tilt),cr=Math.cos(rot),sr=Math.sin(rot);
-  for(const p of PTS){
-    let x=p.x*cr+p.z*sr,z=-p.x*sr+p.z*cr,y=p.y;
-    const y2=y*ct-z*st,z2=y*st+z*ct;
-    if(z2<-.05)continue;
-    const a=(.15+.85*z2)*(p.L?1:.28);
-    cx.fillStyle=col(a,p.L?70:55);const s=(p.L?2:1.2)*DPR;cx.fillRect(X+x*R,Y+y2*R,s,s)}
-  RINGS.forEach(r=>{r.rot+=r.sp;
-    cx.strokeStyle=col(.22);cx.lineWidth=DPR;cx.save();cx.translate(X,Y);cx.rotate(r.rot);
-    cx.beginPath();cx.ellipse(0,0,R*r.k,R*r.k*r.b,r.a,0,7);cx.stroke();
-    const ang=t/1800+r.ph,ex=Math.cos(ang)*R*r.k,ey=Math.sin(ang)*R*r.k*r.b;
-    cx.rotate(r.a);cx.rotate(-r.a);
-    const ca=Math.cos(r.a),sa=Math.sin(r.a);
-    cx.fillStyle=col(1,80);cx.beginPath();cx.arc(ex*ca-ey*sa,ex*sa+ey*ca,3*DPR,0,7);cx.fill();cx.restore()});
-  requestAnimationFrame(frame)}
-requestAnimationFrame(frame);
-/* ---------- boot ---------- */
-const LINES=['[BOOT] Initializing Jarvis core…','[POWER] Primary power path stable.','[VOICE] Speech engine '+(SR?'online.':'unavailable (type commands).'),'[AUDIO] Voice output '+(synth?'ready.':'unavailable.'),'[COMMAND] Local command bridge handshake accepted.','[AUTOMATION] Loading '+modes.length+' workflow modes…','[SYSTEM] Reading device telemetry…','[PROFILE] Loading local profile.','[SECURITY] Code Red protocol armed.','[GUARD] Stability guard nominal.','[READY] Jarvis is online.'];
-let bi=0;const con=$('#console'),bc=$('#bc'),bp=$('#bp');
-const bt=setInterval(()=>{bi++;const p=Math.min(100,Math.round(bi/LINES.length*100));bc.style.strokeDashoffset=327*(1-p/100);bp.textContent=p+'%';
-  con.innerHTML=LINES.slice(0,bi).map(l=>l.replace(/^(\[\w+\])/,'<b>$1</b>')).join('<br>');
-  if(bi>=LINES.length){clearInterval(bt);$('#bootbtn').style.display='block'}},330);
-$('#bootbtn').onclick=()=>{$('#boot').classList.add('hide');setTimeout(()=>$('#boot').remove(),900);
-  if(synth)synth.getVoices();setTimeout(()=>say(greet()),400)};
-if(synth)synth.onvoiceschanged=()=>{};
-</script>
+<script src="script.js"></script>
 </body>
 </html>

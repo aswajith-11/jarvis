@@ -1,0 +1,4 @@
+pyautogui>=0.9.54
+pyperclip>=1.8.2
+psutil>=5.9
+pillow>=10.0

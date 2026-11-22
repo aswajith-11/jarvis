@@ -1,5 +1,6 @@
 @echo off
 title Jarvis Laptop Agent
-python -m pip install --quiet pyautogui
-python "%~dp0agent.py"
+cd /d "%~dp0"
+python -m pip install --quiet -r requirements.txt
+python agent.py
 pause
