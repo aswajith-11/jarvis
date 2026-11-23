@@ -15,6 +15,7 @@ The AI runs **locally in Ollama**: no cloud AI, no API key, no cost.
 | File | Purpose |
 |---|---|
 | index.html, style.css, script.js, manifest, sw.js, icons | The interface (hosted on GitHub Pages; installable as an app) |
+| jarvis.py | **Start here**: `python jarvis.py` installs packages, starts the agent, opens the site |
 | agent.py | Secure local server (localhost only, token required) |
 | planner.py | Rule-based planner for common multi-step commands |
 | ai_brain.py | Ollama connection + validated multi-step planner |
@@ -27,8 +28,11 @@ The AI runs **locally in Ollama**: no cloud AI, no API key, no cost.
 ## Install (Windows 11)
 1. **Python 3.10+** from python.org (tick "Add Python to PATH").
 2. **Ollama** (you have it). Make sure the model exists: `ollama pull llama3.2:1b`
-3. Download this project (green **Code > Download ZIP**), unzip it, and double-click **start_jarvis_agent.bat**.
-4. Your browser opens JARVIS **already connected** (the agent opens `https://aswajith-11.github.io/jarvis/#token=...`).
+3. Download this project (green **Code > Download ZIP**) and unzip it.
+4. Open a Command Prompt in that folder (type `cmd` in the folder's address bar) and run: **`python jarvis.py`**
+   (if "python" is not recognised, run `py jarvis.py`). You can also double-click `jarvis.py`, or use `start_jarvis_agent.bat`.
+   The first run installs a few packages automatically. Keep the window open while using Jarvis.
+5. Your browser opens JARVIS **already connected** (the agent opens `https://aswajith-11.github.io/jarvis/#token=...`).
    Top bar should show `● Agent online` and `Brain: llama3.2:1b`. The 💻 panel has a live setup checklist if anything is missing.
 
 If the page didn't open, or you use a different browser profile, open the site, click 💻 and paste the token from the agent window.

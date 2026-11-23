@@ -93,7 +93,13 @@ class H(BaseHTTPRequestHandler):
         except Exception as e:
             log("ERROR", e); ai_brain.set_state("idle"); self._send(200, {"message": f"That failed: {e}"})
 
-if __name__ == "__main__":
+def main():
+    try:
+        server = ThreadingHTTPServer(("127.0.0.1", config.PORT), H)
+    except OSError:
+        print(f"\n Port {config.PORT} is already in use. JARVIS is probably already running in another window.")
+        print(" Close that window (or just use the Jarvis website, it is already connected).")
+        return False
     n = tools.build_index()
     st = ai_brain.status()
     print("=" * 62)
@@ -111,5 +117,10 @@ if __name__ == "__main__":
     print("=" * 62)
     if config.AUTO_OPEN:
         threading.Timer(1.2, lambda: webbrowser.open(pair)).start()
-    try: ThreadingHTTPServer(("127.0.0.1", config.PORT), H).serve_forever()
+    try: server.serve_forever()
     except KeyboardInterrupt: print("Bye.")
+    return True
+
+
+if __name__ == "__main__":
+    main()
